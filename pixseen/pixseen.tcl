@@ -357,11 +357,8 @@ proc ::pixseen::formatevent {event nick uhost time chan reason othernick} {
 
 ## sqlite functions
 
-proc ::pixseen::rfclwr {text} {
-	string map [list "\[" "\{" "\]" "\}" "\\" "|" "~" "^"] [string toupper $text]
-}
 proc ::pixseen::rfccomp {a b} {
-	string compare [rfclwr $a] [rfclwr $b]
+	string compare [string map [list \{ \[ \} \] ~ ^ | \\] [string toupper $a]] [string map [list \{ \[ \} \] ~ ^ | \\] [string toupper $b]]
 }
 
 proc ::pixseen::chan2id {chan} {
