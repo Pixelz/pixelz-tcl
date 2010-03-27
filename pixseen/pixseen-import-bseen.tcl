@@ -2,6 +2,8 @@
 # the next line restarts using tclsh \
 exec tclsh8.5 "$0" "$@"
 
+# RCS: $Id$
+
 package require Tcl 8.5
 #package require sqlite3
 

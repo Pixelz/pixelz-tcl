@@ -2,6 +2,8 @@
 # the next line restarts using tclsh \
 exec tclsh8.5 "$0" "$@"
 
+# RCS: $Id$
+#
 # ToDo:
 # - initialize the db interface
 # - define sql schema
