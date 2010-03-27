@@ -24,7 +24,6 @@
 # v0.1 by Pixelz - March 26, 2010
 
 # ToDo:
-# - add different search options
 # - add flood protection
 # - add importers for bseen (script), bseen (module), gseen, others?
 # - update msg files
@@ -592,22 +591,20 @@ if {[catch { set result [seendb eval { SELECT nick FROM seenTb, chanTb ON seenTb
 	}
 }
 
-# !seen -regexp -glob nick uhost chan
-# !seen foobar
-# !seen foobar.com
-# !seen #foobar
-
-# !seen foobar foobar.com
-# !seen foobar #foobar
-# !seen foobar.com #foobar
-# !seen foobar.com foobar
-# !seen #foobar foobar
-# !seen #foobar foobar.com
-
-# !seen foobar foobar.com #foobar
-
 proc ::pixseen::ParseArgs {text} {
-	set mode 0
+	# !seen foobar
+	# !seen foobar.com
+	# !seen #foobar
+	# !seen foobar foobar.com
+	# !seen foobar #foobar
+	# !seen foobar.com #foobar
+	# !seen foobar.com foobar
+	# !seen #foobar foobar
+	# !seen #foobar foobar.com
+	# !seen foobar foobar.com #foobar
+	
+	# default to glob mode
+	set mode 1
 
 	# grab the switches
 	set i 0
@@ -627,21 +624,20 @@ proc ::pixseen::ParseArgs {text} {
 			break
 		}
 	}
-	if {$mode <= 1} {
-		set nick {*}
-		set uhost {*}
-		set chan {*}
-	} else {
-		set nick {.*}
-		set uhost {.*}
-		set chan {.*}
-	}
-	
+
 	if {([set arglen [llength [set arg [lrange $arg $i end]]]] < 1) || ($arglen > 3)} {
 		return
 	} elseif {$arglen == 3} {
 		lassign $arg nick uhost chan
+	} elseif {$mode == 2} {
+		lassign $arg nick uhost chan
+		if {$uhost eq {}} { set uhost {.*} }
+		if {$chan eq {}} { set chan {.*} }
 	} else {
+		set nick {*}
+		set uhost {*}
+		set chan {*}
+		
 		set NickDone 0
 		set ChanDone 0
 		set UhostDone 0
@@ -676,6 +672,7 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 	}
 	
 	if {[string equal -nocase $nick $Nick]} {
+		# FixMe: $nick shouldn't be sent on NOTICE here.
 		putseen $nick $chan [mc {%s, go look in a mirror.} $nick]
 		return
 	} elseif {[string equal -nocase ${::botnick} $Nick]} {
@@ -709,55 +706,35 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 			}
 		}
 		{1} {;# glob
-			if {[set result [dbSearchGlob $Nick $Uhost $Chan]] eq {}} {
-				if {[set handseen [handseen $Nick]] ne {}} {
-					putseen $nick $chan $handseen
-					return 1
-				} else {
-					putseen $nick $chan [mc {There were no matches to your query.}]
-					return
-				}
-			} else {
-				if {[set numMatches [llength $result]] > 3} {
-					putseen $nick $chan [mc {Displaying %1$s of %2$s results.} {3} $numMatches]
-				} else {
-					putseen $nick $chan [mc {Displaying %1$s of %2$s results.} $numMatches $numMatches]
-				}
-				lassign $result match1 match2 match3
-				putseen $nick $chan [formatevent {*}[dbGetNick $match1]]
-				if {$match2 ne {}} {
-					putseen $nick $chan [formatevent {*}[dbGetNick $match2]]
-				}
-				if {$match3 ne {}} {
-					putseen $nick $chan [formatevent {*}[dbGetNick $match3]]
-				}
-			}
+			set result [dbSearchGlob $Nick $Uhost $Chan]
 		}
 		{2} {;# regex
-			if {[set result [dbSearchRegex $Nick $Uhost $Chan]] eq {}} {
-				if {[set handseen [handseen $Nick]] ne {}} {
-					putseen $nick $chan $handseen
-					return 1
-				} else {
-					putseen $nick $chan [mc {There were no matches to your query.}]
-					return
-				}
-			} else {
-				if {[set numMatches [llength $result]] > 3} {
-					putseen $nick $chan [mc {Displaying %1$s of %2$s results.} {3} $numMatches]
-				} else {
-					putseen $nick $chan [mc {Displaying %1$s of %2$s results.} $numMatches $numMatches]
-				}
-				lassign $result match1 match2 match3
-				putseen $nick $chan [formatevent {*}[dbGetNick $match1]]
-				if {$match2 ne {}} {
-					putseen $nick $chan [formatevent {*}[dbGetNick $match2]]
-				}
-				if {$match3 ne {}} {
-					putseen $nick $chan [formatevent {*}[dbGetNick $match3]]
-				}
-			}
+			set result [dbSearchRegex $Nick $Uhost $Chan]
 		}
+	}
+	if {$result eq {}} {
+		if {[set handseen [handseen $Nick]] ne {}} {
+			putseen $nick $chan $handseen
+			return 1
+		} else {
+			putseen $nick $chan [mc {There were no matches to your query.}]
+			return
+		}
+	} else {
+		if {[set numMatches [llength $result]] > 3} {
+			putseen $nick $chan [mc {Displaying %1$s of %2$s results:} {3} $numMatches]
+		} else {
+			putseen $nick $chan [mc {Displaying %1$s of %2$s results:} $numMatches $numMatches]
+		}
+		lassign $result match1 match2 match3
+		putseen $nick $chan [formatevent {*}[dbGetNick $match1]]
+		if {$match2 ne {}} {
+			putseen $nick $chan [formatevent {*}[dbGetNick $match2]]
+		}
+		if {$match3 ne {}} {
+			putseen $nick $chan [formatevent {*}[dbGetNick $match3]]
+		}
+		return 1
 	}
 	return
 }
