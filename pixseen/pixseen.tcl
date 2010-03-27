@@ -28,9 +28,8 @@
 # - add importers for bseen (script), bseen (module), gseen, others?
 # - update msg files
 # - botnet support?
-
 # - add a function that reads the db and cleans out unused channels
-#.tcl ::pixseen::seendb eval { SELECT chanid FROM chanTb WHERE chanid NOT IN (SELECT chanid FROM seenTb WHERE chanid = chanTb.chanid) }
+#	.tcl ::pixseen::seendb eval { SELECT chanid FROM chanTb WHERE chanid NOT IN (SELECT chanid FROM seenTb WHERE chanid = chanTb.chanid) }
 
 package require Tcl 8.5
 package require msgcat 1.4.2
