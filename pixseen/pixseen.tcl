@@ -224,6 +224,7 @@ proc ::pixseen::onpartyline {handle} {
 	return
 }
 
+# Formats seen events for output
 proc ::pixseen::formatevent {event nick uhost time chan reason othernick} {
 	set duration [pixduration [expr {[clock seconds] - $time}]]
 	switch -exact -- $event {
@@ -372,6 +373,7 @@ proc ::pixseen::chan2id {chan} {
 	}
 }
 
+# SQLite regexp function, squelches regex errors and turn on nocase
 proc ::pixseen::pixregexp {args} {
 	if {[catch {set result [regexp -nocase -- {*}$args]}]} {
 		return 0
@@ -473,6 +475,8 @@ proc ::pixseen::dbAdd {nick event timestamp uhost args} {
 	return
 }
 
+## event binds
+
 proc ::pixseen::PART {nick uhost hand chan msg} {
 	dbAdd $nick {part} [clock seconds] $uhost $chan $msg
 	return
@@ -556,6 +560,8 @@ proc ::pixseen::AWAY {botname idx text} {
 	return
 }
 
+##
+
 # returns a list of: id event nick uhost time chan reason othernick
 proc ::pixseen::dbGetNick {target} {
 	if {[catch {set result [seendb eval { SELECT event, nick, uhost, time, chanTb.chan, reason, othernick FROM seenTb, chanTb ON seenTb.chanid = chanTb.chanid WHERE nick=$target LIMIT 1 }]} error]} {
@@ -591,6 +597,11 @@ if {[catch { set result [seendb eval { SELECT nick FROM seenTb, chanTb ON seenTb
 	}
 }
 
+# Parses command arguments.
+# Returns: a list of "nick uhost chan mode".
+# Mode 0 = exact matching (the default)
+# Mode 1 = glob matching
+# Mode 2 = regex matching
 proc ::pixseen::ParseArgs {text} {
 	# !seen foobar
 	# !seen foobar.com
@@ -603,8 +614,8 @@ proc ::pixseen::ParseArgs {text} {
 	# !seen #foobar foobar.com
 	# !seen foobar foobar.com #foobar
 	
-	# default to glob mode
-	set mode 1
+	# default to exact mode
+	set mode 0
 
 	# grab the switches
 	set i 0
@@ -663,6 +674,8 @@ proc ::pixseen::ParseArgs {text} {
 	return [list $nick $uhost $chan $mode]
 }
 
+# Handle public !seen
+# !seen [-exact/-glob/-regex] [--] <nick> [user@host] [channel]}
 proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 	if {[set arg [ParseArgs [join [lrange [split $text] 1 end]]]] eq {}} {
 		putseen $nick $chan [mc {%1$s, Usage: %2$s} $nick {!seen [-exact/-glob/-regex] [--] <nick> [user@host] [channel]}]
@@ -739,6 +752,7 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 	return
 }
 
+# Handle /msg botnick seen 
 proc ::pixseen::msgm_seen {nick uhost hand text} {
 	if {![validnick [set target [lindex [split $text] 1]]]} {
 		puthelp "NOTICE $nick :[mc {That is not a valid nickname.}]"
@@ -763,6 +777,7 @@ proc ::pixseen::msgm_seen {nick uhost hand text} {
 	}
 }
 
+# Handle partyline .seen
 proc ::pixseen::dcc_seen {hand idx text} {
 	if {![validnick [set target [lindex [split $text] 0]]]} {
 		putdcc $idx [mc {That is not a valid nickname.}]
@@ -921,15 +936,16 @@ proc ::pixseen::msg_die {cmdString op} {
 }
 
 namespace eval ::pixseen {
-	# trace die
+	# trace die so that we can unload the database properly before the bot exist
 	trace add execution die enter ::pixseen::UNLOAD
 	trace add execution *dcc:die enter ::pixseen::UNLOAD
 	trace add execution *msg:die enter ::pixseen::msg_die
 	# load the database if it's not already loaded
 	if {[info procs seendb] ne {seendb}} { ::pixseen::LOAD }
-	# binds
+	# unload the database on rehash & restart
 	bind evnt - {prerehash} ::pixseen::UNLOAD
 	bind evnt - {prerestart} ::pixseen::UNLOAD
+	# seen tracking events
 	bind part - "*" ::pixseen::PART
 	bind join - "*" ::pixseen::JOIN
 	bind nick - "*" ::pixseen::NICK
@@ -942,6 +958,7 @@ namespace eval ::pixseen {
 	bind chjn - "*" ::pixseen::CHJN
 	bind chpt - "*" ::pixseen::CHPT
 	bind away - "*" ::pixseen::AWAY
+	# triggers
 	bind pubm - {% ?seen *} ::pixseen::pubm_seen
 	bind pubm - {% seen *} ::pixseen::pubm_seen
 	bind msgm - {seen *} ::pixseen::msgm_seen
