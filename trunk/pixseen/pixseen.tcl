@@ -248,7 +248,7 @@ proc ::pixseen::formatevent {event nick uhost time chan reason othernick} {
 				return [mc {%1$s (%2$s) was last seen joining a channel %3$s ago.} $nick $uhost $duration]
 			} else {
 				if {[onchan $nick $chan]} {
-					return [mc {%1$s (%2$s) was last seen joining %3$s %4$s ago. %5$s is still on %1$s.} $nick $uhost $chan $duration]
+					return [mc {%1$s (%2$s) was last seen joining %3$s %4$s ago. %1$s is still on %3$s.} $nick $uhost $chan $duration]
 				} else {
 					return [mc {%1$s (%2$s) was last seen joining %3$s %4$s ago. I don't see %1$s on %3$s now, though.} $nick $uhost $chan $duration]
 				}
@@ -373,33 +373,15 @@ proc ::pixseen::chan2id {chan} {
 	}
 }
 
-##
-
-# returns a list of: id event nick uhost time chan reason othernick
-proc ::pixseen::dbGetNick {target} {
-	if {[catch {set result [seendb eval { SELECT event, nick, uhost, time, chanTb.chan, reason, othernick FROM seenTb, chanTb ON seenTb.chanid = chanTb.chanid WHERE nick=$target LIMIT 1 }]} error]} {
-		putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
-		return
-	}
-	return $result
-}
-
-# returns: a list of nicks matching the pattern
-proc ::pixseen::dbSearchGlob {nick uhost chan} {
-	# transform GLOB syntax into LIKE syntax:
-	set nick [string map [list "\\" "\\\\" "%" "\%" "_" "\_" "*" "%" "?" "_"] $nick]
-	set uhost [string map [list "\\" "\\\\" "%" "\%" "_" "\_" "*" "%" "?" "_"] $uhost]
-	set chan [string map [list "\\" "\\\\" "%" "\%" "_" "\_" "*" "%" "?" "_"] $chan]
-	if {$nick eq {}} { set nick "*"	}
-	if {$uhost eq {}} { set uhost "*" }	                                       
-	if {[catch { set result [seendb eval { SELECT nick FROM seenTb, chanTb ON seenTb.chanid = chanTb.chanid WHERE nick LIKE $nick ESCAPE '\' AND uhost LIKE $uhost ESCAPE '\' AND chanTb.chan LIKE $chan ESCAPE '\' }] } error]} {
-		putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
-		return
+proc ::pixseen::pixregexp {args} {
+	if {[catch {set result [regexp -nocase -- {*}$args]}]} {
+		return 0
 	} else {
 		return $result
 	}
 }
 
+##
 
 proc ::pixseen::dbAdd {nick event timestamp uhost args} {
 	switch -exact -- $event {
@@ -575,6 +557,41 @@ proc ::pixseen::AWAY {botname idx text} {
 	return
 }
 
+# returns a list of: id event nick uhost time chan reason othernick
+proc ::pixseen::dbGetNick {target} {
+	if {[catch {set result [seendb eval { SELECT event, nick, uhost, time, chanTb.chan, reason, othernick FROM seenTb, chanTb ON seenTb.chanid = chanTb.chanid WHERE nick=$target LIMIT 1 }]} error]} {
+		putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+		return
+	}
+	return $result
+}
+
+# returns: a list of nicks matching the pattern
+proc ::pixseen::dbSearchGlob {nick uhost chan} {
+	# transform GLOB syntax into LIKE syntax:
+	set nick [string map [list "\\" "\\\\" "%" "\%" "_" "\_" "*" "%" "?" "_"] $nick]
+	set uhost [string map [list "\\" "\\\\" "%" "\%" "_" "\_" "*" "%" "?" "_"] $uhost]
+	set chan [string map [list "\\" "\\\\" "%" "\%" "_" "\_" "*" "%" "?" "_"] $chan]
+	if {$nick eq {}} { set nick "*"	}
+	if {$uhost eq {}} { set uhost "*" }	                                       
+	if {[catch { set result [seendb eval { SELECT nick FROM seenTb, chanTb ON seenTb.chanid = chanTb.chanid WHERE nick LIKE $nick ESCAPE '\' AND uhost LIKE $uhost ESCAPE '\' AND chanTb.chan LIKE $chan ESCAPE '\' }] } error]} {
+		putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+		return
+	} else {
+		return $result
+	}
+}
+
+# returns: a list of nicks matching the pattern
+proc ::pixseen::dbSearchRegex {nick uhost chan} {
+if {[catch { set result [seendb eval { SELECT nick FROM seenTb, chanTb ON seenTb.chanid = chanTb.chanid WHERE nick REGEXP $nick AND uhost REGEXP $uhost AND chanTb.chan REGEXP $chan }] } error]} {
+		putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+		return
+	} else {
+		return $result
+	}
+}
+
 # !seen -regexp -glob nick uhost chan
 # !seen foobar
 # !seen foobar.com
@@ -591,9 +608,6 @@ proc ::pixseen::AWAY {botname idx text} {
 
 proc ::pixseen::ParseArgs {text} {
 	set mode 0
-	set nick {*}
-	set uhost {*}
-	set chan {*}
 
 	# grab the switches
 	set i 0
@@ -612,6 +626,15 @@ proc ::pixseen::ParseArgs {text} {
 		} else {
 			break
 		}
+	}
+	if {$mode <= 1} {
+		set nick {*}
+		set uhost {*}
+		set chan {*}
+	} else {
+		set nick {.*}
+		set uhost {.*}
+		set chan {.*}
 	}
 	
 	if {([set arglen [llength [set arg [lrange $arg $i end]]]] < 1) || ($arglen > 3)} {
@@ -696,9 +719,9 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 				}
 			} else {
 				if {[set numMatches [llength $result]] > 3} {
-					putseen $nick $chan [mc {Displaying %1$s of %2$s maches.} {3} $numMatches]
+					putseen $nick $chan [mc {Displaying %1$s of %2$s results.} {3} $numMatches]
 				} else {
-					putseen $nick $chan [mc {Displaying %1$s of %2$s maches.} $numMatches $numMatches]
+					putseen $nick $chan [mc {Displaying %1$s of %2$s results.} $numMatches $numMatches]
 				}
 				lassign $result match1 match2 match3
 				putseen $nick $chan [formatevent {*}[dbGetNick $match1]]
@@ -711,7 +734,29 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 			}
 		}
 		{2} {;# regex
-			
+			if {[set result [dbSearchRegex $Nick $Uhost $Chan]] eq {}} {
+				if {[set handseen [handseen $Nick]] ne {}} {
+					putseen $nick $chan $handseen
+					return 1
+				} else {
+					putseen $nick $chan [mc {There were no matches to your query.}]
+					return
+				}
+			} else {
+				if {[set numMatches [llength $result]] > 3} {
+					putseen $nick $chan [mc {Displaying %1$s of %2$s results.} {3} $numMatches]
+				} else {
+					putseen $nick $chan [mc {Displaying %1$s of %2$s results.} $numMatches $numMatches]
+				}
+				lassign $result match1 match2 match3
+				putseen $nick $chan [formatevent {*}[dbGetNick $match1]]
+				if {$match2 ne {}} {
+					putseen $nick $chan [formatevent {*}[dbGetNick $match2]]
+				}
+				if {$match3 ne {}} {
+					putseen $nick $chan [formatevent {*}[dbGetNick $match3]]
+				}
+			}
 		}
 	}
 	return
@@ -801,6 +846,7 @@ proc ::pixseen::LOAD {args} {
 	sqlite3 ::pixseen::seendb $dbfile
 	seendb collate IRCRFC ::pixseen::rfccomp
 	seendb function chan2id ::pixseen::chan2id
+	seendb function regexp ::pixseen::pixregexp
 	# FixMe: catch this SELECT
 	if {[seendb eval {SELECT tbl_name FROM sqlite_master}] eq {}} {
 		# there's no tables defined, so we define some
