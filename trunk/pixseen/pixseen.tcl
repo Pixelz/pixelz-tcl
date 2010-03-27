@@ -171,7 +171,7 @@ proc ::pixseen::validnick {nick} {
 	}
 	if {[string length $nick] > $len} {
 		return 0
-	} elseif {![regexp -- {^[a-zA-Z\|\[\]`^\{\}][a-zA-Z0-9\-\|\[\]`^\{\}]*$} $nick]} {
+	} elseif {![regexp -- {^[a-zA-Z\|\[\]`^\{\}][a-zA-Z0-9\-\|\[\]`^\{\}\\]*$} $nick]} {
 		return 0
 	} else {
 		return 1
@@ -358,7 +358,7 @@ proc ::pixseen::formatevent {event nick uhost time chan reason othernick} {
 ## sqlite functions
 
 proc ::pixseen::rfclwr {text} {
-	string map [list "\[" "\{" "\]" "\}" "\\" "|" "~" "^"] [string tolower $text]
+	string map [list "\[" "\{" "\]" "\}" "\\" "|" "~" "^"] [string toupper $text]
 }
 proc ::pixseen::rfccomp {a b} {
 	string compare [rfclwr $a] [rfclwr $b]
@@ -388,13 +388,14 @@ proc ::pixseen::dbGetNick {target} {
 }
 
 # returns: a list of nicks matching the pattern
-proc ::pixseen::dbSearch {nick uhost chan} {
+proc ::pixseen::dbSearchGlob {nick uhost chan} {
 	# transform GLOB syntax into LIKE syntax:
 	set nick [string map [list "\\" "\\\\" "%" "\%" "_" "\_" "*" "%" "?" "_"] $nick]
 	set uhost [string map [list "\\" "\\\\" "%" "\%" "_" "\_" "*" "%" "?" "_"] $uhost]
+	set chan [string map [list "\\" "\\\\" "%" "\%" "_" "\_" "*" "%" "?" "_"] $chan]
 	if {$nick eq {}} { set nick "*"	}
-	if {$uhost eq {}} { set uhost "*" }
-	if {[catch { set result [seendb eval { SELECT nick FROM seenTb WHERE nick LIKE $nick ESCAPE '\' AND uhost LIKE $uhost ESCAPE '\' AND chan LIKE $chan ESCAPE '\' LIMIT 5 }] } error]} {
+	if {$uhost eq {}} { set uhost "*" }	                                       
+	if {[catch { set result [seendb eval { SELECT nick FROM seenTb, chanTb ON seenTb.chanid = chanTb.chanid WHERE nick LIKE $nick ESCAPE '\' AND uhost LIKE $uhost ESCAPE '\' AND chanTb.chan LIKE $chan ESCAPE '\' }] } error]} {
 		putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
 		return
 	} else {
@@ -648,16 +649,13 @@ proc ::pixseen::ParseArgs {text} {
 
 proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 	if {[set arg [ParseArgs [join [lrange [split $text] 1 end]]]] eq {}} {
-		putseen $nick $chan [mc {%1$s, Usage: %2$s} $nick {!seen [-exact/-glob/-regexp] [--] <nick> [user@host] [channel]}]
+		putseen $nick $chan [mc {%1$s, Usage: %2$s} $nick {!seen [-exact/-glob/-regex] [--] <nick> [user@host] [channel]}]
 		return
 	} else {
 		lassign $arg Nick Uhost Chan Mode
 	}
 	
-	if {![validnick $Nick]} {
-		putseen $nick $chan [mc {%s, that is not a valid nickname.} $nick]
-		return
-	} elseif {[string equal -nocase $nick $Nick]} {
+	if {[string equal -nocase $nick $Nick]} {
 		putseen $nick $chan [mc {%s, go look in a mirror.} $nick]
 		return
 	} elseif {[string equal -nocase ${::botnick} $Nick]} {
@@ -670,18 +668,56 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 			putseen $nick $chan [mc {%1$s is on the channel right now! %1$s last spoke %2$s ago.} $Nick $lastspoke]
 		}
 		return
-	} elseif {[set result [dbGetNick $Nick]] eq {}} {
-		if {[set handseen [handseen $Nick]] ne {}} {
-			putseen $nick $chan $handseen
-			return 1
-		} else {
-			putseen $nick $chan [mc {I don't remember seeing %s.} $target]
-			return
-		}
-	} else {
-		putseen $nick $chan [formatevent {*}$result]
-		return 1
 	}
+	
+	switch -exact -- $Mode {
+		{0} {;# exact
+			if {![validnick $Nick]} {
+				putseen $nick $chan [mc {%s, that is not a valid nickname.} $nick]
+				return
+			} elseif {[set result [dbGetNick $Nick]] eq {}} {
+				if {[set handseen [handseen $Nick]] ne {}} {
+					putseen $nick $chan $handseen
+					return 1
+				} else {
+					putseen $nick $chan [mc {I don't remember seeing %s.} $Nick]
+					return
+				}
+			} else {
+				putseen $nick $chan [formatevent {*}$result]
+				return 1
+			}
+		}
+		{1} {;# glob
+			if {[set result [dbSearchGlob $Nick $Uhost $Chan]] eq {}} {
+				if {[set handseen [handseen $Nick]] ne {}} {
+					putseen $nick $chan $handseen
+					return 1
+				} else {
+					putseen $nick $chan [mc {There were no matches to your query.}]
+					return
+				}
+			} else {
+				if {[set numMatches [llength $result]] > 3} {
+					putseen $nick $chan [mc {Displaying %1$s of %2$s maches.} {3} $numMatches]
+				} else {
+					putseen $nick $chan [mc {Displaying %1$s of %2$s maches.} $numMatches $numMatches]
+				}
+				lassign $result match1 match2 match3
+				putseen $nick $chan [formatevent {*}[dbGetNick $match1]]
+				if {$match2 ne {}} {
+					putseen $nick $chan [formatevent {*}[dbGetNick $match2]]
+				}
+				if {$match3 ne {}} {
+					putseen $nick $chan [formatevent {*}[dbGetNick $match3]]
+				}
+			}
+		}
+		{2} {;# regex
+			
+		}
+	}
+	return
 }
 
 proc ::pixseen::msgm_seen {nick uhost hand text} {
