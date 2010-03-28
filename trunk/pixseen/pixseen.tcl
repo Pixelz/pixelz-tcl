@@ -24,12 +24,10 @@
 # v0.1 by Pixelz - March 26, 2010
 
 # ToDo:
-# - add flood protection
 # - add importers for bseen (script), bseen (module), gseen, others?
 # - update msg files
 # - botnet support?
-# - add a function that reads the db and cleans out unused channels
-#	.tcl ::pixseen::seendb eval { SELECT chanid FROM chanTb WHERE chanid NOT IN (SELECT chanid FROM seenTb WHERE chanid = chanTb.chanid) }
+# - host based (tld) language selection?
 
 package require Tcl 8.5
 package require msgcat 1.4.2
@@ -55,6 +53,7 @@ namespace eval ::pixseen {
 	variable ::botnick
 	variable ::botnet-nick
 	variable ::nicklen
+	variable seenFlood
 	variable seenver {0.1}
 	variable dbVersion 1
 }
@@ -221,6 +220,46 @@ proc ::pixseen::onpartyline {handle} {
 		if {[string equal -nocase $handle $nick]} { return [partychanname $chan] }
 	}
 	return
+}
+
+# checks the flood array and removes old timestamps.
+# will eventually remove itself if we're not being flooded
+proc ::pixseen::RemoveFlood {args} {
+	variable seenFlood
+	if {![array exists seenFlood]} { return }
+	set time [clock seconds]
+	foreach uhost [array names seenFlood] {
+		foreach timestamp $seenFlood($uhost) {
+			# don't append the timestamp if it's older than 60 seconds
+			if {[expr {$time - 60}] <= $timestamp} {
+				lappend stampList $timestamp
+			}
+		}
+		if {[info exists stampList]} {
+			set seenFlood($uhost) $stampList
+		} else {
+			array unset seenFlood $uhost
+		}
+	}
+}
+
+# returns 1 if we're flooded, 0 if not
+proc ::pixseen::checkflood {uhost} {
+	variable seenFlood
+	RemoveFlood
+	# case 1: uhost doesn't exist in the array, we're not being flooded
+	if {![info exists seenFlood($uhost)]} {
+		set seenFlood($uhost) [clock seconds]
+		return 0
+	# case 2: the list for this uhost is full, so we're being flooded with 6 lines over 60 seconds
+	} elseif {[llength $seenFlood($uhost)] >= 6} {
+		set seenFlood($uhost) [concat "[lrange [lsort -integer $seenFlood($uhost)] 1 end] [clock seconds]"]
+		return 1
+	# case 3: the list for this uhost isn't full, we're not being flooded
+	} else {
+		lappend seenFlood($uhost) [clock seconds]
+		return 0
+	}
 }
 
 # Formats seen events for output
@@ -596,6 +635,20 @@ if {[catch { set result [seendb eval { SELECT nick FROM seenTb, chanTb ON seenTb
 	}
 }
 
+# cleans out unused channels from the database
+proc ::pixseen::dbCleanup {args} {
+	if {[catch {set idList [seendb eval { SELECT chanid FROM chanTb WHERE chanid NOT IN (SELECT chanid FROM seenTb WHERE chanid = chanTb.chanid) }]} error]} {
+		putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+	} elseif {$idList ne {}} {
+		foreach id $idList {
+			if {[catch {seendb eval { DELETE FROM chanTb WHERE chanid=$id }} error]} {
+				putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+			}
+		}
+	}
+	return
+}
+
 # Parses command arguments.
 # Returns: a list of "nick uhost chan mode".
 # Mode 0 = exact matching (the default)
@@ -653,12 +706,12 @@ proc ::pixseen::ParseArgs {text} {
 		set UhostDone 0
 		foreach item $arg {
 			# nick
-			if {!$NickDone && [regexp -- {^[^#&.][^.]*$} $item]} {
+			if {!$NickDone && [regexp -- {^[^#&!+.][^.]*$} $item]} {
 				set nick $item
 				set NickDone 1
 				continue
 			# channel
-			} elseif {!$ChanDone && [string match {[#&]*} $item]} {
+			} elseif {!$ChanDone && [string match {[#&!+]*} $item]} {
 				set chan $item
 				set ChanDone 1
 				continue
@@ -676,6 +729,11 @@ proc ::pixseen::ParseArgs {text} {
 # Handle public !seen
 # !seen [-exact/-glob/-regex] [--] <nick> [user@host] [channel]}
 proc ::pixseen::pubm_seen {nick uhost hand chan text} {
+	if {![matchattr $hand f|f $chan]} {
+		if {[checkflood $uhost] != 0} {
+			return 0
+		}
+	}
 	if {[set arg [ParseArgs [join [lrange [split $text] 1 end]]]] eq {}} {
 		putseen $nick $chan [mc {%1$s, Usage: %2$s} $nick {!seen [-exact/-glob/-regex] [--] <nick> [user@host] [channel]}]
 		return
@@ -753,6 +811,11 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 
 # Handle /msg botnick seen 
 proc ::pixseen::msgm_seen {nick uhost hand text} {
+	if {![matchattr $hand f]} {
+		if {[checkflood $uhost] != 0} {
+			return 0
+		}
+	}
 	if {![validnick [set target [lindex [split $text] 1]]]} {
 		puthelp "NOTICE $nick :[mc {That is not a valid nickname.}]"
 		return
@@ -912,6 +975,8 @@ proc ::pixseen::LOAD {args} {
 			
 		# Everything is OK!
 		}  else {
+			# Do some database maintenance
+			dbCleanup
 			putlog [mc {pixseen.tcl: Loaded the seen database.}]
 		}
 	}
@@ -962,5 +1027,9 @@ namespace eval ::pixseen {
 	bind pubm - {% seen *} ::pixseen::pubm_seen
 	bind msgm - {seen *} ::pixseen::msgm_seen
 	bind dcc - {seen} ::pixseen::dcc_seen
+	# flood-array cleanup every 10 minutes
+	bind time - "?0 * * * *" ::pixseen::RemoveFlood
+	# do some database maintenance once daily
+	bind evnt - {logfile} ::pixseen::dbCleanup
 	putlog [mc {Loaded %1$s v%2$s by %3$s} {pixseen.tcl} $seenver {Pixelz}]
 }
