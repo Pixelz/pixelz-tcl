@@ -28,6 +28,7 @@
 # - update msg files
 # - botnet support?
 # - host based (tld) language selection?
+# - add search for msg/dcc
 
 package require Tcl 8.5
 package require msgcat 1.4.2
@@ -181,16 +182,6 @@ proc ::pixseen::issecret {chan} {
 		return 1
 	} else {
 		return 0
-	}
-}
-
-# output proc
-proc ::pixseen::putseen {nick chan text} {
-	variable outnotc
-	if {$outnotc == 0} {
-		puthelp "NOTICE $nick :$text"
-	} else {
-		puthelp "PRIVMSG $chan :$text"
 	}
 }
 
@@ -401,10 +392,10 @@ proc ::pixseen::rfccomp {a b} {
 
 proc ::pixseen::chan2id {chan} {
 	if {[catch {seendb eval { INSERT OR IGNORE INTO chanTb VALUES(NULL, $chan); }} error]} {
-		putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+		putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 	}
 	if {[catch {set retval [seendb eval { SELECT chanid FROM chanTb WHERE chan=$chan LIMIT 1 }]} error]} {
-		putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+		putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 		return -code error [mc {SQL error %1$s; %2$s} [seendb errorcode] $error]
 	} else {
 		return $retval
@@ -427,13 +418,13 @@ proc ::pixseen::dbAdd {nick event timestamp uhost args} {
 		{part} {;# 0
 			lassign $args chan reason
 			if {[catch {seendb eval { INSERT OR REPLACE INTO seenTb VALUES(0, $nick, $uhost, $timestamp, chan2id($chan), $reason, NULL) }} error]} {
-				putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+				putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 			}
 		}
 		{join} {;# 1
 			lassign $args chan
 			if {[catch {seendb eval { INSERT OR REPLACE INTO seenTb VALUES(1, $nick, $uhost, $timestamp, chan2id($chan), NULL, NULL) }} error]} {
-				putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+				putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 			}
 		}
 		{nick} {;# 2 & 3
@@ -444,65 +435,65 @@ proc ::pixseen::dbAdd {nick event timestamp uhost args} {
 				-- new nick;
 				INSERT OR REPLACE INTO seenTb VALUES(3, $newnick, $uhost, $timestamp, chan2id($chan), NULL, $nick);
 			}} error]} {
-				putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+				putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 			}
 		}
 		{sign} {;# 4 (quit)
 			lassign $args chan reason
 			if {[catch {seendb eval { INSERT OR REPLACE INTO seenTb VALUES(4, $nick, $uhost, $timestamp, chan2id($chan), $reason, NULL) }} error]} {
-				putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+				putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 			}
 		}
 		{splt} {;# 5
 			lassign $args chan
 			if {[catch {seendb eval { INSERT OR REPLACE INTO seenTb VALUES(5, $nick, $uhost, $timestamp, chan2id($chan), NULL, NULL) }} error]} {
-				putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+				putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 			}
 		}
 		{rejn} {;# 6
 			lassign $args chan
 			if {[catch {seendb eval { INSERT OR REPLACE INTO seenTb VALUES(6, $nick, $uhost, $timestamp, chan2id($chan), NULL, NULL) }} error]} {
-				putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+				putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 			}
 		}
 		{kick} {;# 7
 			lassign $args chan reason aggressor
 			if {[catch {seendb eval { INSERT OR REPLACE INTO seenTb VALUES(7, $nick, $uhost, $timestamp, chan2id($chan), $reason, $aggressor) }} error]} {
-				putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+				putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 			}
 		}
 		{chon} {;# 8 (enters partyline)
 			if {[catch {seendb eval { INSERT OR REPLACE INTO seenTb VALUES(8, $nick, $uhost, $timestamp, NULL, NULL, NULL) }} error]} {
-				putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+				putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 			}
 		}
 		{chof} {;# 9 (leaves partyline)
 			if {[catch {seendb eval { INSERT OR REPLACE INTO seenTb VALUES(9, $nick, $uhost, $timestamp, NULL, NULL, NULL) }} error]} {
-				putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+				putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 			}
 		}
 		{chjn} {;# 10 (joins partyline channel)
 			lassign $args chan botname
 			if {[catch {seendb eval { INSERT OR REPLACE INTO seenTb VALUES(10, $nick, $uhost, $timestamp, chan2id($chan), NULL, $botname) }} error]} {
-				putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+				putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 			}
 		}
 		{chpt} {;# 11 (parts partyline channel)
 			lassign $args chan botname
 			if {[catch {seendb eval { INSERT OR REPLACE INTO seenTb VALUES(11, $nick, $uhost, $timestamp, chan2id($chan), NULL, $botname) }} error]} {
-				putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+				putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 			}
 		}
 		{away} {;# 12 (partyline away)
 			lassign $args botname reason
 			if {[catch {seendb eval { INSERT OR REPLACE INTO seenTb VALUES(12, $nick, $uhost, $timestamp, NULL, $reason, $botname) }} error]} {
-				putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+				putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 			}
 		}
 		{back} {;# 13 (partyline back from away)
 			lassign $args botname
 			if {[catch {seendb eval { INSERT OR REPLACE INTO seenTb VALUES(13, $nick, $uhost, $timestamp, NULL, NULL, $botname) }} error]} {
-				putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+				putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 			}
 		}
 		default {
@@ -603,7 +594,7 @@ proc ::pixseen::AWAY {botname idx text} {
 # returns a list of: id event nick uhost time chan reason othernick
 proc ::pixseen::dbGetNick {target} {
 	if {[catch {set result [seendb eval { SELECT event, nick, uhost, time, chanTb.chan, reason, othernick FROM seenTb, chanTb ON seenTb.chanid = chanTb.chanid WHERE nick=$target LIMIT 1 }]} error]} {
-		putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+		putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 		return
 	}
 	return $result
@@ -618,7 +609,7 @@ proc ::pixseen::dbSearchGlob {nick uhost chan} {
 	if {$nick eq {}} { set nick "*"	}
 	if {$uhost eq {}} { set uhost "*" }	                                       
 	if {[catch { set result [seendb eval { SELECT nick FROM seenTb, chanTb ON seenTb.chanid = chanTb.chanid WHERE nick LIKE $nick ESCAPE '\' AND uhost LIKE $uhost ESCAPE '\' AND chanTb.chan LIKE $chan ESCAPE '\' }] } error]} {
-		putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+		putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 		return
 	} else {
 		return $result
@@ -628,7 +619,7 @@ proc ::pixseen::dbSearchGlob {nick uhost chan} {
 # returns: a list of nicks matching the pattern
 proc ::pixseen::dbSearchRegex {nick uhost chan} {
 if {[catch { set result [seendb eval { SELECT nick FROM seenTb, chanTb ON seenTb.chanid = chanTb.chanid WHERE nick REGEXP $nick AND uhost REGEXP $uhost AND chanTb.chan REGEXP $chan }] } error]} {
-		putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+		putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 		return
 	} else {
 		return $result
@@ -637,12 +628,13 @@ if {[catch { set result [seendb eval { SELECT nick FROM seenTb, chanTb ON seenTb
 
 # cleans out unused channels from the database
 proc ::pixseen::dbCleanup {args} {
+	putlog [mc {%s: performing database maintenance...} {pixseen.tcl}]
 	if {[catch {set idList [seendb eval { SELECT chanid FROM chanTb WHERE chanid NOT IN (SELECT chanid FROM seenTb WHERE chanid = chanTb.chanid) }]} error]} {
-		putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+		putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 	} elseif {$idList ne {}} {
 		foreach id $idList {
 			if {[catch {seendb eval { DELETE FROM chanTb WHERE chanid=$id }} error]} {
-				putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+				putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 			}
 		}
 	}
@@ -726,12 +718,25 @@ proc ::pixseen::ParseArgs {text} {
 	return [list $nick $uhost $chan $mode]
 }
 
+
+# output proc
+proc ::pixseen::putseen {nick chan notcText {msgText {}}} {
+	variable outnotc
+	if {$outnotc == 0} {
+		puthelp "NOTICE $nick :$text"
+	} elseif {$msgText != {}} {
+		puthelp "PRIVMSG $chan :$msgText"
+	} else {
+		puthelp "PRIVMSG $chan :$text"
+	}
+}
+
 # Handle public !seen
 # !seen [-exact/-glob/-regex] [--] <nick> [user@host] [channel]}
 proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 	if {![matchattr $hand f|f $chan]} {
 		if {[checkflood $uhost] != 0} {
-			return 0
+			return
 		}
 	}
 	if {[set arg [ParseArgs [join [lrange [split $text] 1 end]]]] eq {}} {
@@ -742,11 +747,10 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 	}
 	
 	if {[string equal -nocase $nick $Nick]} {
-		# FixMe: $nick shouldn't be sent on NOTICE here.
-		putseen $nick $chan [mc {%s, go look in a mirror.} $nick]
+		putseen $nick $chan [mc {Go look in a mirror.}] [mc {%s, go look in a mirror.} $nick]
 		return
 	} elseif {[string equal -nocase ${::botnick} $Nick]} {
-		putseen $nick $chan [mc {You found me, %s!} $nick]
+		putseen $nick $chan [mc {You found me!}] [mc {You found me, %s!} $nick]
 		return
 	} elseif {[onchan $Nick $chan]} {
 		if {[set lastspoke [lastspoke $Nick $chan]] eq {}} {
@@ -760,7 +764,7 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 	switch -exact -- $Mode {
 		{0} {;# exact
 			if {![validnick $Nick]} {
-				putseen $nick $chan [mc {%s, that is not a valid nickname.} $nick]
+				putseen $nick $chan [mc {That is not a valid nickname.}] [mc {%s, that is not a valid nickname.} $nick]
 				return
 			} elseif {[set result [dbGetNick $Nick]] eq {}} {
 				if {[set handseen [handseen $Nick]] ne {}} {
@@ -813,7 +817,7 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 proc ::pixseen::msgm_seen {nick uhost hand text} {
 	if {![matchattr $hand f]} {
 		if {[checkflood $uhost] != 0} {
-			return 0
+			return
 		}
 	}
 	if {![validnick [set target [lindex [split $text] 1]]]} {
@@ -901,10 +905,11 @@ proc ::pixseen::LOAD {args} {
 	seendb collate IRCRFC ::pixseen::rfccomp
 	seendb function chan2id ::pixseen::chan2id
 	seendb function regexp ::pixseen::pixregexp
-	# FixMe: catch this SELECT
-	if {[seendb eval {SELECT tbl_name FROM sqlite_master}] eq {}} {
+	if {[catch {set result [seendb eval {SELECT tbl_name FROM sqlite_master}]} error]} {
+		putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
+	} elseif {$result eq {}} {
 		# there's no tables defined, so we define some
-		putlog [mc {pixseen.tcl: No existing database found, defining SQL schema.}]
+		putlog [mc {%s: No existing database found, defining SQL schema.} {pixseen.tcl}]
 		if {[catch {seendb eval {
 			-- Create a table and populate it with a version integer in case we need to change the schema in the future.
 			CREATE TABLE pixseen (
@@ -929,55 +934,55 @@ proc ::pixseen::LOAD {args} {
 				chan STRING UNIQUE NOT NULL COLLATE IRCRFC
 			);
 		}} error]} {
-			putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+			putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 		}
 	} else {
 		# There's already data in this database, so we verify the schema
 		# Verify the table names
 		if {[catch { set result [seendb eval { SELECT tbl_name FROM sqlite_master WHERE type='table' ORDER BY tbl_name }] } error]} {
-			putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+			putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 			die [mc {Fatal Error!}]
 		} elseif {[join $result] ne {chanTb pixseen seenTb}} {
-			putlog [mc {pixseen.tcl FATAL ERROR; SQLite database corrupt, exiting.}]
+			putlog [mc {%1$s: FATAL ERROR; SQLite database corrupt, exiting.} {pixseen.tcl}]
 			die [mc {Fatal Error!}]
 			
 		# Verify the pixseen table
 		} elseif {[catch { set result [seendb eval { PRAGMA table_info(pixseen) }] } error]} {
-			putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+			putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 			die [mc {Fatal Error!}]
 		} elseif {![ValidTable {pixseen} $result]} {
-			putlog [mc {pixseen.tcl FATAL ERROR; SQLite database corrupt, exiting.}]
+			putlog [mc {%1$s: FATAL ERROR; SQLite database corrupt, exiting.} {pixseen.tcl}]
 			die [mc {Fatal Error!}]
 			
 		# Verify the database version
 		} elseif {[catch { set result [seendb eval { SELECT dbVersion FROM pixseen LIMIT 1  }] } error]} {
-			putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+			putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 			die [mc {Fatal Error!}]
 		} elseif {$result != $dbVersion} {
-			putlog [mc {pixseen.tcl FATAL ERROR; SQLite database corrupt, exiting.}]
+			putlog [mc {%1$s: FATAL ERROR; SQLite database corrupt, exiting.} {pixseen.tcl}]
 			die [mc {Fatal Error!}]
 			
 		# Verify the seenTb table
 		} elseif {[catch { set result [seendb eval { PRAGMA table_info(seenTb) }] } error]} {
-			putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+			putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 			die [mc {Fatal Error!}]
 		} elseif {![ValidTable {seenTb} $result]} {
-			putlog [mc {pixseen.tcl FATAL ERROR; SQLite database corrupt, exiting.}]
+			putlog [mc {%1$s: FATAL ERROR; SQLite database corrupt, exiting.} {pixseen.tcl}]
 			die [mc {Fatal Error!}]
 			
 		# Verify the chanTb table
 		} elseif {[catch { set result [seendb eval { PRAGMA table_info(chanTb) }] } error]} {
-			putlog [mc {pixseen.tcl SQL error %1$s; %2$s} [seendb errorcode] $error]
+			putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 			die [mc {Fatal Error!}]
 		} elseif {![ValidTable {chanTb} $result]} {
-			putlog [mc {pixseen.tcl FATAL ERROR; SQLite database corrupt, exiting.}]
+			putlog [mc {%1$s: FATAL ERROR; SQLite database corrupt, exiting.} {pixseen.tcl}]
 			die [mc {Fatal Error!}]
 			
 		# Everything is OK!
 		}  else {
 			# Do some database maintenance
 			dbCleanup
-			putlog [mc {pixseen.tcl: Loaded the seen database.}]
+			putlog [mc {%s: Loaded the seen database.} {pixseen.tcl}]
 		}
 	}
 	return
@@ -985,7 +990,7 @@ proc ::pixseen::LOAD {args} {
 
 proc ::pixseen::UNLOAD {args} {
 	seendb close
-	putlog [mc {pixseen.tcl: Unloaded the seen database.}]
+	putlog [mc {%s: Unloaded the seen database.} {pixseen.tcl]
 	return
 }
 
