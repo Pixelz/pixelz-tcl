@@ -27,6 +27,8 @@
 # - add importers for bseen (script), bseen (module), gseen, others?
 # - botnet support?
 # - FixMe's
+# - Add a channel specific language setting
+# - Fix traces on Tcldrop
 # - update msg files
 # - Change the date & version before release
 
@@ -1097,8 +1099,11 @@ proc ::pixseen::msg_die {cmdString op} {
 namespace eval ::pixseen {
 	# trace die so that we can unload the database properly before the bot exist
 	trace add execution die enter ::pixseen::UNLOAD
-	trace add execution *dcc:die enter ::pixseen::UNLOAD
-	trace add execution *msg:die enter ::pixseen::msg_die
+	# don't try to trace these on Tcldrop
+	if {![info exists tcldrop]} {
+		trace add execution *dcc:die enter ::pixseen::UNLOAD
+		trace add execution *msg:die enter ::pixseen::msg_die
+	}
 	# load the database if it's not already loaded
 	if {[info procs seendb] ne {seendb}} { ::pixseen::LOAD }
 	# unload the database on rehash & restart
