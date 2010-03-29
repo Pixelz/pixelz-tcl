@@ -25,10 +25,10 @@
 
 # ToDo:
 # - add importers for bseen (script), bseen (module), gseen, others?
-# - update msg files
 # - botnet support?
 # - host based (tld) language selection?
-# - add search for msg/dcc
+# - FixMe's
+# - update msg files
 
 package require Tcl 8.5
 package require msgcat 1.4.2
@@ -169,7 +169,8 @@ proc ::pixseen::validnick {nick} {
 	}
 	if {[string length $nick] > $len} {
 		return 0
-	} elseif {![regexp -- {^[a-zA-Z\|\[\]`^\{\}][a-zA-Z0-9\-\|\[\]`^\{\}\\]*$} $nick]} {
+	# FixMe: make sure these are all of the valid chars
+	} elseif {![regexp -- {^[a-zA-Z\|\[\]`^\{\}][a-zA-Z0-9\-_\|\[\]`^\{\}\\]*$} $nick]} {
 		return 0
 	} else {
 		return 1
@@ -723,11 +724,11 @@ proc ::pixseen::ParseArgs {text} {
 proc ::pixseen::putseen {nick chan notcText {msgText {}}} {
 	variable outnotc
 	if {$outnotc == 0} {
-		puthelp "NOTICE $nick :$text"
+		puthelp "NOTICE $nick :$notcText"
 	} elseif {$msgText != {}} {
 		puthelp "PRIVMSG $chan :$msgText"
 	} else {
-		puthelp "PRIVMSG $chan :$text"
+		puthelp "PRIVMSG $chan :$notcText"
 	}
 }
 
@@ -740,7 +741,7 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 		}
 	}
 	if {[set arg [ParseArgs [join [lrange [split $text] 1 end]]]] eq {}} {
-		putseen $nick $chan [mc {%1$s, Usage: %2$s} $nick {!seen [-exact/-glob/-regex] [--] <nick> [user@host] [channel]}]
+		putseen $nick $chan [mc {Usage: %s} {!seen [-exact/-glob/-regex] [--] <nick> [user@host] [channel]}] [mc {%1$s, Usage: %2$s} $nick {!seen [-exact/-glob/-regex] [--] <nick> [user@host] [channel]}]
 		return
 	} else {
 		lassign $arg Nick Uhost Chan Mode
@@ -800,13 +801,10 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 		} else {
 			putseen $nick $chan [mc {Displaying %1$s of %2$s results:} $numMatches $numMatches]
 		}
-		lassign $result match1 match2 match3
-		putseen $nick $chan [formatevent {*}[dbGetNick $match1]]
-		if {$match2 ne {}} {
-			putseen $nick $chan [formatevent {*}[dbGetNick $match2]]
-		}
-		if {$match3 ne {}} {
-			putseen $nick $chan [formatevent {*}[dbGetNick $match3]]
+		foreach match [lrange $result 0 2] {
+			if {$match ne {}} {
+				putseen $nick $chan [formatevent {*}[dbGetNick $match]]
+			}
 		}
 		return 1
 	}
@@ -820,52 +818,130 @@ proc ::pixseen::msgm_seen {nick uhost hand text} {
 			return
 		}
 	}
-	if {![validnick [set target [lindex [split $text] 1]]]} {
-		puthelp "NOTICE $nick :[mc {That is not a valid nickname.}]"
+	if {[set arg [ParseArgs [join [lrange [split $text] 1 end]]]] eq {}} {
+		puthelp "NOTICE $nick :[mc {Usage: %s} {seen [-exact/-glob/-regex] [--] <nick> [user@host] [channel]}]"
 		return
-	} elseif {[string equal -nocase $nick $target]} {
+	} else {
+		lassign $arg Nick Uhost Chan Mode
+	}
+	if {[string equal -nocase $nick $Nick]} {
 		puthelp "NOTICE $nick :[mc {Go look in a mirror.}]"
 		return
-	} elseif {[string equal -nocase $target $::botnick]} {
+	} elseif {[string equal -nocase ${::botnick} $Nick]} {
 		puthelp "NOTICE $nick :[mc {You found me!}]"
 		return
-	} elseif {[set result [dbGetNick $target]] eq {}} {
-		if {[set handseen [handseen $target]] ne {}} {
+	}
+	switch -exact -- $Mode {
+		{0} {;# exact
+			if {![validnick $Nick]} {
+				puthelp "NOTICE $nick :[mc {That is not a valid nickname.}]"
+				return
+			} elseif {[set result [dbGetNick $Nick]] eq {}} {
+				if {[set handseen [handseen $Nick]] ne {}} {
+					puthelp "NOTICE $nick :$handseen"
+					return 1
+				} else {
+					puthelp "NOTICE $nick :[mc {I don't remember seeing %s.} $Nick]"
+					return
+				}
+			} else {
+				puthelp "NOTICE $nick :[formatevent {*}$result]"
+				return 1
+			}
+		}
+		{1} {;# glob
+			set result [dbSearchGlob $Nick $Uhost $Chan]
+		}
+		{2} {;# regex
+			set result [dbSearchRegex $Nick $Uhost $Chan]
+		}
+	}
+	if {$result eq {}} {
+		if {[set handseen [handseen $Nick]] ne {}} {
 			puthelp "NOTICE $nick :$handseen"
 			return 1
 		} else {
-			puthelp "NOTICE $nick :[mc {I don't remember seeing %s.} $target]"
+			puthelp "NOTICE $nick :[mc {There were no matches to your query.}]"
 			return
 		}
 	} else {
-		puthelp "NOTICE $nick :[formatevent {*}$result]"
+		if {[set numMatches [llength $result]] > 5} {
+			puthelp "NOTICE $nick :[mc {Displaying %1$s of %2$s results:} {5} $numMatches]"
+		} else {
+			puthelp "NOTICE $nick :[mc {Displaying %1$s of %2$s results:} $numMatches $numMatches]"
+		}
+		foreach match [lrange $result 0 4] {
+			if {$match ne {}} {
+				puthelp "NOTICE $nick :[formatevent {*}[dbGetNick $match]]"
+			}
+		}
 		return 1
 	}
+	return
 }
 
 # Handle partyline .seen
 proc ::pixseen::dcc_seen {hand idx text} {
-	if {![validnick [set target [lindex [split $text] 0]]]} {
-		putdcc $idx [mc {That is not a valid nickname.}]
+	if {[set arg [ParseArgs $text]] eq {}} {
+		putdcc $idx [mc {Usage: %s} {.seen [-exact/-glob/-regex] [--] <nick> [user@host] [channel]}]
 		return
-	} elseif {[string equal -nocase $hand $target]} {
+	} else {
+		lassign $arg Nick Uhost Chan Mode
+	}
+	if {[string equal -nocase $hand $Nick]} {
 		putdcc $idx [mc {Go look in a mirror.}]
 		return
-	} elseif {[string equal -nocase $target $::botnick]} {
+	} elseif {[string equal -nocase ${::botnick} $Nick]} {
 		putdcc $idx [mc {You found me!}]
 		return
-	} elseif {[set result [dbGetNick $target]] eq {}} {
-		if {[set handseen [handseen $target]] ne {}} {
+	}
+	switch -exact -- $Mode {
+		{0} {;# exact
+			if {![validnick $Nick]} {
+				putdcc $idx [mc {That is not a valid nickname.}]
+				return
+			} elseif {[set result [dbGetNick $Nick]] eq {}} {
+				if {[set handseen [handseen $Nick]] ne {}} {
+					putdcc $idx $handseen
+					return 1
+				} else {
+					putdcc $idx [mc {I don't remember seeing %s.} $Nick]
+					return
+				}
+			} else {
+				putdcc $idx [formatevent {*}$result]
+				return 1
+			}
+		}
+		{1} {;# glob
+			set result [dbSearchGlob $Nick $Uhost $Chan]
+		}
+		{2} {;# regex
+			set result [dbSearchRegex $Nick $Uhost $Chan]
+		}
+	}
+	if {$result eq {}} {
+		if {[set handseen [handseen $Nick]] ne {}} {
 			putdcc $idx $handseen
 			return 1
 		} else {
-			putdcc $idx [mc {I don't remember seeing %s.} $target]
+			putdcc $idx [mc {There were no matches to your query.}]
 			return
 		}
 	} else {
-		putdcc $idx [formatevent {*}$result]
+		if {[set numMatches [llength $result]] > 10} {
+			putdcc $idx [mc {Displaying %1$s of %2$s results:} {10} $numMatches]
+		} else {
+			putdcc $idx [mc {Displaying %1$s of %2$s results:} $numMatches $numMatches]
+		}
+		foreach match [lrange $result 0 9] {
+			if {$match ne {}} {
+				putdcc $idx [formatevent {*}[dbGetNick $match]]
+			}
+		}
 		return 1
 	}
+	return
 }
 
 # verifies table information, return 1 if it's valid, 0 if not
@@ -990,7 +1066,7 @@ proc ::pixseen::LOAD {args} {
 
 proc ::pixseen::UNLOAD {args} {
 	seendb close
-	putlog [mc {%s: Unloaded the seen database.} {pixseen.tcl]
+	putlog [mc {%s: Unloaded the seen database.} {pixseen.tcl}]
 	return
 }
 
