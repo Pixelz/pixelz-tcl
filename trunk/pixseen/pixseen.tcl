@@ -63,9 +63,23 @@ namespace eval ::pixseen {
 
 # msgcat compatible duration proc
 proc ::pixseen::pixduration {seconds} {
-	set a [list {year} [mc {year}] {years} [mc {years}] {month} [mc {month}] {months} [mc {months}] {week} [mc {week}] {weeks} [mc {weeks}] {day} [mc {day}] {days} [mc {days}]]
-	set b [list {hour} [mc {hour}] {hours} [mc {hours}] {minute} [mc {minute}] {minutes} [mc {minutes}] {second} [mc {second}] {seconds} [mc {seconds}]]
-	string map [concat $a $b] [duration $seconds]
+	set map [list \
+		{years} [mc {years}] \
+		{year} [mc {year}] \
+		{months} [mc {months}] \
+		{month} [mc {month}] \
+		{weeks} [mc {weeks}] \
+		{week} [mc {week}] \
+		{days} [mc {days}] \
+		{day} [mc {day}] \
+		{hours} [mc {hours}] \
+		{hour} [mc {hour}] \
+		{minutes} [mc {minutes}] \
+		{minute} [mc {minute}] \
+		{seconds} [mc {seconds}] \
+		{second} [mc {second}] \
+	]
+	string map $map [duration $seconds]
 }
 
 # takes an idx and returns the user@host associated with it.
