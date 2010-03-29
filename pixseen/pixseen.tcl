@@ -21,14 +21,14 @@
 #
 # RCS: $Id$
 #
-# v0.1 by Pixelz - March 26, 2010
+# v0.1 by Pixelz - March 29, 2010
 
 # ToDo:
 # - add importers for bseen (script), bseen (module), gseen, others?
 # - botnet support?
-# - host based (tld) language selection?
 # - FixMe's
 # - update msg files
+# - Change the date & version before release
 
 package require Tcl 8.5
 package require msgcat 1.4.2
