@@ -28,7 +28,6 @@
 # - botnet support?
 # - FixMe's
 # - Add a channel specific language setting
-# - Fix traces on Tcldrop
 # - update msg files
 # - Change the date & version before release
 
@@ -49,10 +48,14 @@ namespace eval ::pixseen {
 	
 	## end of settings ##
 	
+	# list of locales, if you translate the script, add your translation to this list
+	variable locales [list "en" "en_us_bork"]
+	
 	namespace import ::msgcat::*
 	# load msg files
 	mcload [file join [file dirname [info script]] pixseen-msgs]
-	setudef flag {pixseen}
+	setudef flag {seen}
+	setudef str {seenlang}
 	variable ::botnick
 	variable ::botnet-nick
 	variable ::nicklen
@@ -62,6 +65,15 @@ namespace eval ::pixseen {
 }
 
 ## utility procs
+
+proc ::pixseen::validlang {lang} {
+	variable locales
+	if {[lsearch -exact -nocase $locales $lang] == -1} {
+		return 0
+	} else {
+		return 1
+	}
+}
 
 # msgcat compatible duration proc
 proc ::pixseen::pixduration {seconds} {
@@ -751,7 +763,9 @@ proc ::pixseen::putseen {nick chan notcText {msgText {}}} {
 # Handle public !seen
 # !seen [-exact/-glob/-regex] [--] <nick> [user@host] [channel]}
 proc ::pixseen::pubm_seen {nick uhost hand chan text} {
-	if {![matchattr $hand f|f $chan]} {
+	if {![channel get $chan {seen}]} {
+		return
+	} elseif {![matchattr $hand f|f $chan]} {
 		if {[checkflood $uhost] != 0} {
 			return
 		}
@@ -769,7 +783,8 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 	} elseif {[string equal -nocase ${::botnick} $Nick]} {
 		putseen $nick $chan [mc {You found me!}] [mc {You found me, %s!} $nick]
 		return
-	} elseif {[onchan $Nick $chan]} {
+	# Tcldrop supports glob matching for onchan, so check if Nick is valid first
+	} elseif {[validnick $Nick] && [onchan $Nick $chan]} {
 		if {[set lastspoke [lastspoke $Nick $chan]] eq {}} {
 			putseen $nick $chan [mc {%s is on the channel right now!} $Nick]
 		} else {
@@ -1096,13 +1111,52 @@ proc ::pixseen::msg_die {cmdString op} {
 	return
 }
 
+# chanset wrapper
+# checks the language people set and complains if it's not supported.
+proc ::pixseen::dcc_chanset {hand idx param} {
+	set chan [lindex [set arg [split $param]] 0]
+	if {![validchan $chan]} {
+		*DCC:CHANSET $hand $idx $param
+		return
+	}
+	set settings [lrange $arg 1 end]
+	set found 0
+	foreach setting $settings {
+		if {$found} {
+			set lang $setting
+		} elseif {[string equal -nocase $setting {seenlang}]} {
+			set found 1
+		}
+	}
+	if {[info exists lang] && ![validlang $lang]} {
+		putdcc $idx [mc {Error: Invalid seen language "%s".} $lang]
+		return
+	} else {
+		*DCC:CHANSET $hand $idx $param
+		return
+	}
+}
+
+# This proc will be renamed to ::*dcc:chanset on load. We call out real
+# wrapper from here so that it can stay in the correct namespace
+proc ::pixseen::*dcc:chanset {hand idx param} {
+	::pixseen::dcc_chanset $hand $idx $param
+}
+
 namespace eval ::pixseen {
 	# trace die so that we can unload the database properly before the bot exist
-	trace add execution die enter ::pixseen::UNLOAD
-	# don't try to trace these on Tcldrop
-	if {![info exists tcldrop]} {
-		trace add execution *dcc:die enter ::pixseen::UNLOAD
-		trace add execution *msg:die enter ::pixseen::msg_die
+	if {![info exists SetTraces]} {
+		trace add execution die enter ::pixseen::UNLOAD
+		# don't try to trace these on Tcldrop
+		if {![info exists ::tcldrop]} {
+			trace add execution *dcc:die enter ::pixseen::UNLOAD
+			trace add execution *msg:die enter ::pixseen::msg_die
+			# wrap chanset so we can validate the language people set
+			# FixMe: add Tcldrop equivalent
+			rename ::*dcc:chanset ::*DCC:CHANSET
+			rename ::pixseen::*dcc:chanset ::*dcc:chanset
+		}
+		variable SetTraces 1
 	}
 	# load the database if it's not already loaded
 	if {[info procs seendb] ne {seendb}} { ::pixseen::LOAD }
