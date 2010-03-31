@@ -44,7 +44,7 @@ namespace eval ::pixseen {
 	variable outnotc 1
 	
 	# Language
-	::msgcat::mclocale en
+	variable defaultLang "en"
 	
 	## end of settings ##
 	
@@ -52,8 +52,13 @@ namespace eval ::pixseen {
 	variable locales [list "en" "en_us_bork"]
 	
 	namespace import ::msgcat::*
-	# load msg files
-	mcload [file join [file dirname [info script]] pixseen-msgs]
+	# mcload fails to load _all_ .msg files, so we have to do it manually
+	foreach f [glob -directory [file join [file dirname [info script]] pixseen-msgs] -type {b c f l} *.msg] {
+		source -encoding {utf-8} $f
+	}
+	unset -nocomplain f
+	
+	mclocale $defaultLang
 	setudef flag {seen}
 	setudef str {seenlang}
 	variable ::botnick
@@ -763,6 +768,7 @@ proc ::pixseen::putseen {nick chan notcText {msgText {}}} {
 # Handle public !seen
 # !seen [-exact/-glob/-regex] [--] <nick> [user@host] [channel]}
 proc ::pixseen::pubm_seen {nick uhost hand chan text} {
+	variable defaultLang
 	if {![channel get $chan {seen}]} {
 		return
 	} elseif {![matchattr $hand f|f $chan]} {
@@ -770,8 +776,11 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 			return
 		}
 	}
+	# Set the locale for this channel
+	if {[validlang [channel get $chan seenlang]]} { mclocale [channel get $chan seenlang]  }
 	if {[set arg [ParseArgs [join [lrange [split $text] 1 end]]]] eq {}} {
 		putseen $nick $chan [mc {Usage: %s} {!seen [-exact/-glob/-regex] [--] <nick> [user@host] [channel]}] [mc {%1$s, Usage: %2$s} $nick {!seen [-exact/-glob/-regex] [--] <nick> [user@host] [channel]}]
+		mclocale $defaultLang
 		return
 	} else {
 		lassign $arg Nick Uhost Chan Mode
@@ -779,9 +788,11 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 	
 	if {[string equal -nocase $nick $Nick]} {
 		putseen $nick $chan [mc {Go look in a mirror.}] [mc {%s, go look in a mirror.} $nick]
+		mclocale $defaultLang
 		return
 	} elseif {[string equal -nocase ${::botnick} $Nick]} {
 		putseen $nick $chan [mc {You found me!}] [mc {You found me, %s!} $nick]
+		mclocale $defaultLang
 		return
 	# Tcldrop supports glob matching for onchan, so check if Nick is valid first
 	} elseif {[validnick $Nick] && [onchan $Nick $chan]} {
@@ -790,6 +801,7 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 		} else {
 			putseen $nick $chan [mc {%1$s is on the channel right now! %1$s last spoke %2$s ago.} $Nick $lastspoke]
 		}
+		mclocale $defaultLang
 		return
 	}
 	
@@ -797,17 +809,21 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 		{0} {;# exact
 			if {![validnick $Nick]} {
 				putseen $nick $chan [mc {That is not a valid nickname.}] [mc {%s, that is not a valid nickname.} $nick]
+				mclocale $defaultLang
 				return
 			} elseif {[set result [dbGetNick $Nick]] eq {}} {
 				if {[set handseen [handseen $Nick]] ne {}} {
 					putseen $nick $chan $handseen
+					mclocale $defaultLang
 					return 1
 				} else {
 					putseen $nick $chan [mc {I don't remember seeing %s.} $Nick]
+					mclocale $defaultLang
 					return
 				}
 			} else {
 				putseen $nick $chan [formatevent {*}$result]
+				mclocale $defaultLang
 				return 1
 			}
 		}
@@ -821,9 +837,11 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 	if {$result eq {}} {
 		if {[set handseen [handseen $Nick]] ne {}} {
 			putseen $nick $chan $handseen
+			mclocale $defaultLang
 			return 1
 		} else {
 			putseen $nick $chan [mc {There were no matches to your query.}]
+			mclocale $defaultLang
 			return
 		}
 	} else {
@@ -837,8 +855,10 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 				putseen $nick $chan [formatevent {*}[dbGetNick $match]]
 			}
 		}
+		mclocale $defaultLang
 		return 1
 	}
+	mclocale $defaultLang
 	return
 }
 
