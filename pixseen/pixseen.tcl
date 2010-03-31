@@ -27,7 +27,6 @@
 # - add importers for bseen (script), bseen (module), gseen, others?
 # - botnet support?
 # - FixMe's
-# - Add a channel specific language setting
 # - update msg files
 # - Change the date & version before release
 
