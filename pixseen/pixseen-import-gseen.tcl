@@ -96,7 +96,7 @@ package require sqlite3
 namespace eval ::pixseen {
 	
 	# path to the database file
-	variable dbfile {scripts/pixseen.db}
+	variable dbfile {pixseen.db}
 	
 	## END OF SETTINGS ##
 	variable dbVersion 1
