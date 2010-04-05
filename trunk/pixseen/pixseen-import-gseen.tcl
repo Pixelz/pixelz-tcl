@@ -88,7 +88,7 @@ exec $lastfullpath "$0" ${1+"$@"}
 #
 # RCS: $Id$
 #
-# v1.0 by Pixelz, March 31, 2010
+# v1.0 by Pixelz - April 5, 2010
 
 package require Tcl 8.5
 package require sqlite3

@@ -1,10 +1,7 @@
 # pixseen.tcl --
 #
-#       SQLite powered seen script. Still pre-release, more things to come.
+#       SQLite powered seen script. Keeps track of everyone, based on nickname.
 #
-#       WARNING! THIS SCRIPT IS STILL UNRELEASED, DO NOT USE EXCEPT FOR TESTING
-#       THE DATABASE FORMAT MAY CHANGE WITHOUT NOTICE BEFORE RELEASE!
-# 
 # Copyright (c) 2010, Rickard Utgren <rutgren@gmail.com>
 #
 # Permission to use, copy, modify, and/or distribute this software for any
@@ -21,14 +18,7 @@
 #
 # RCS: $Id$
 #
-# v0.1 by Pixelz - March 29, 2010
-
-# ToDo:
-# - add importers for bseen (script), bseen (module), gseen, others?
-# - botnet support?
-# - FixMe's
-# - update msg files
-# - Change the date & version before release
+# v1.0 by Pixelz - April 5, 2010
 
 package require Tcl 8.5
 package require msgcat 1.4.2
@@ -64,7 +54,7 @@ namespace eval ::pixseen {
 	variable ::botnet-nick
 	variable ::nicklen
 	variable seenFlood
-	variable seenver {0.1}
+	variable seenver {1.0}
 	variable dbVersion 1
 }
 
