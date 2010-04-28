@@ -18,7 +18,13 @@
 #
 # RCS: $Id$
 #
+# v1.1 by Pixelz - April 28, 2010
+#	- Fixed a problem with ValidTable always failing on some older SQLite versions
+#	- Fixed a problem with the public trigger never showing the syntax help
+#	- Minor fixes
+#
 # v1.0 by Pixelz - April 5, 2010
+#	- Initial release
 
 package require Tcl 8.5
 package require msgcat 1.4.2
@@ -42,7 +48,7 @@ namespace eval ::pixseen {
 	
 	namespace import ::msgcat::*
 	# mcload fails to load _all_ .msg files, so we have to do it manually
-	foreach f [glob -directory [file join [file dirname [info script]] pixseen-msgs] -type {b c f l} *.msg] {
+	foreach f [glob -nocomplain -directory [file join [file dirname [info script]] pixseen-msgs] -type {b c f l} *.msg] {
 		source -encoding {utf-8} $f
 	}
 	unset -nocomplain f
@@ -54,7 +60,7 @@ namespace eval ::pixseen {
 	variable ::botnet-nick
 	variable ::nicklen
 	variable seenFlood
-	variable seenver {1.0}
+	variable seenver {1.1}
 	variable dbVersion 1
 }
 
@@ -386,7 +392,7 @@ proc ::pixseen::formatevent {event nick uhost time chan reason othernick} {
 				return [mc {%1$s (%2$s) was last seen leaving the partyline from %3$s %4$s ago.} $nick $uhost [partychanname $chan] $duration]
 			}
 		}
-		{12} {;# away (partyline away
+		{12} {;# away (partyline away)
 			if {[onpartyline $nick] ne {}} {
 				return [mc {%1$s was last seen marked as away (%2$s) on the partyline %3$s ago. %1$s is on the partyline right now.} $nick $reason $duration]
 			} else {
@@ -407,8 +413,9 @@ proc ::pixseen::formatevent {event nick uhost time chan reason othernick} {
 	}
 }
 
-## sqlite functions
+## SQLite functions
 
+# This is the SQLite collation function, if it's changed, the index has to be rebuilt with REINDEX or it'll cause Weird Behaviour
 proc ::pixseen::rfccomp {a b} {
 	string compare [string map [list \{ \[ \} \] ~ ^ | \\] [string toupper $a]] [string map [list \{ \[ \} \] ~ ^ | \\] [string toupper $b]]
 }
@@ -988,30 +995,92 @@ proc ::pixseen::dcc_seen {hand idx text} {
 proc ::pixseen::ValidTable {table data} {
 	switch -exact -- $table {
 		{pixseen} {
-			if {[join $data] eq {0 dbVersion INTEGER 1  0}} {
-				return 1
-			} else {
+			# 0 dbVersion INTEGER 1 {} 0
+			lassign $data id name type null default primaryKey
+			if {$id != 0 || $name ne {dbVersion} || $type ne {INTEGER} || $null < 1 || $default ne {} || $primaryKey > 0} {
 				return 0
 			}
 		}
 		{seenTb} {
-			if {[join $data] eq {0 event INTEGER 1  0 1 nick STRING 1  1 2 uhost STRING 1  0 3 time INTEGER 1  0 4 chanid INTEGER 0  0 5 reason STRING 0  0 6 othernick STRING 0  0}} {
-				return 1
-			} else {
-				return 0
+			foreach item $data {
+				lassign $data id name type null default primaryKey
+				switch -exact -- $id {
+					{0} {
+						# 0 event INTEGER 1 {} 0
+						if {$name ne {event} || $type ne {INTEGER} || $null < 1 || $default ne {} || $primaryKey > 0} {
+							return 0
+						}
+					}
+					{1} {
+						# 1 nick STRING 1 {} 1
+						if {$name ne {nick} || $type ne {STRING} || $null < 1 || $default ne {} || $primaryKey < 1} {
+							return 0
+						}
+					}
+					{2} {
+						# 2 uhost STRING 1 {} 0
+						if {$name ne {uhost} || $type ne {STRING} || $null < 1 || $default ne {} || $primaryKey > 0} {
+							return 0
+						}
+					}
+					{3} {
+						# 3 time INTEGER 1 {} 0
+						if {$name ne {time} || $type ne {INTEGER} || $null < 1 || $default ne {} || $primaryKey > 0} {
+							return 0
+						}
+					}
+					{4} {
+						# 4 chanid INTEGER 0 {} 0
+						if {$name ne {chanid} || $type ne {INTEGER} || $null > 0 || $default ne {} || $primaryKey > 0} {
+							return 0
+						}
+					}
+					{5} {
+						# 5 reason STRING 0 {} 0
+						if {$name ne {reason} || $type ne {STRING} || $null > 0 || $default ne {} || $primaryKey > 0} {
+							return 0
+						}
+					}
+					{6} {
+						# 6 othernick STRING 0 {} 0
+						if {$name ne {othernick} || $type ne {STRING} || $null > 0 || $default ne {} || $primaryKey > 0} {
+							return 0
+						}
+					}
+					default {
+						return 0
+					}
+				}
+				
 			}
 		}
 		{chanTb} {
-			if {[join $data] eq {0 chanid INTEGER 1  1 1 chan STRING 1  0}} {
-				return 1
-			} else {
-				return 0
+			foreach item $data {
+				lassign $data id name type null default primaryKey
+				switch -exact -- $id {
+					{0} {
+						#0 chanid INTEGER 1 {} 1 
+						if {$name ne {chanid} || $type ne {INTEGER} || $null < 1 || $default ne {} || $primaryKey < 1} {
+							return 0
+						}
+					}
+					{1} {
+						#1 chan STRING 1 {} 0
+						if {$name ne {chan} || $type ne {STRING} || $null < 1 || $default ne {} || $primaryKey > 0} {
+							return 0
+						}
+					}
+					default {
+						return 0
+					}
+				}
 			}
 		}
 		default {
 			return 0
 		}
 	}
+	return 1
 }
 
 # Prepare the database on load
@@ -1188,6 +1257,7 @@ namespace eval ::pixseen {
 	# triggers
 	bind pubm - {% ?seen *} ::pixseen::pubm_seen
 	bind pubm - {% seen *} ::pixseen::pubm_seen
+	bind pubm - {% ?seen} ::pixseen::pubm_seen
 	bind msgm - {seen *} ::pixseen::msgm_seen
 	bind dcc - {seen} ::pixseen::dcc_seen
 	# flood-array cleanup every 10 minutes
