@@ -41,6 +41,8 @@
 # - cleanup cleanup cleanup
 # - depend on eggdrop1.6.20 once it's released
 # - fix FixMe's
+# - Check the size in the HEAD request, and bail out if it's something insane
+# - Ideally, I'd want to only get the first few KBs of the data, and stop once </title> is found, or bail out if it's fetching too much data.
 #
 # Either:
 # - Rewrite to use "::http::geturl -command" once 1.6.20 is out or the fileevent quickfix is commited to CVS
