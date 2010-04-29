@@ -17,6 +17,8 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
+# RCS: $Id$
+#
 # v0.1 by Pixelz (rutgren@gmail.com), April 29, 2010
 
 # I'm holding release of this script until eggdrop 1.6.20 is released, because
