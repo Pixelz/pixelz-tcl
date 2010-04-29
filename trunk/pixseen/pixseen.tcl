@@ -18,13 +18,37 @@
 #
 # RCS: $Id$
 #
-# v1.1 by Pixelz - April 28, 2010
+# v1.1 by Pixelz - unreleased
 #	- Fixed a problem with ValidTable always failing on some older SQLite versions
 #	- Fixed a problem with the public trigger never showing the syntax help
 #	- Minor fixes
 #
 # v1.0 by Pixelz - April 5, 2010
 #	- Initial release
+
+# ToDo:
+# - add some kind of botnet synching
+#		- auto-discover pixseen bots on link
+#		- auto-assign a primary bot for each channel that will answer public requests
+#		* Possible different routes for inter-bot information sharing:
+#			* "Synch everything" route:
+#				- synch databases on link
+#				- keep synching across the net whenever there's a change.
+#					- probably do this blindly, to account for IRCDs that doesn't show all joins/parts (ircu)
+#					- perhaps add some logic to this, so bots dont push info to other bots that are in the same channel (and would see it anyway), at least on non-ircu, non-chanmode-D channels
+#			* "Ask botnet" route:
+#				- Don't synch databases
+#				- Ask other bots for information on each seen request to the bot
+#			* Considerations:
+#				* For both of these methods, the clock probably has to fairly synched up, particularly for the "synch everything" route
+#					- A simple solution: check TS delta on link, and complain loudly if it's too high, or compensate for it somehow
+# - Add IRCU support ("hidden" users in +D channels) -> names -d #chan
+# - add option to track every channel separately
+# - track channel idle time, this would probably synergize well with the "track each channel separetly" option
+# - find out if it's a good idea to [catch] each sql query (catch is slow, is there a better alternative?)
+# - test the idx lookup stuff more, I suspect there's a bug in it somewhere
+# - perhaps get rid of the daily unused-channels cleanup, and do it the same way as pixinfo.tcl.
+#		- Make sure this isn't hugely resource intensive first.
 
 package require Tcl 8.5
 package require msgcat 1.4.2
