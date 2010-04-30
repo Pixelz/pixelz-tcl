@@ -17,7 +17,7 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
-# RCS: $Id: http-title.tcl 35 2010-04-29 20:25:59Z rutgren $
+# RCS: $Id$
 #
 # Notes:
 #     Flags (i.e. global, case-insensitive) aren't supported directly in the
