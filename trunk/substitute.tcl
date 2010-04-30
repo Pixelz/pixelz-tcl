@@ -71,6 +71,11 @@
 #     <nick> s/(?i)a/x/s/(?i)b/y
 #     <bot> Nick meant: "xxx yyy"
 #
+#     Substitution guru:
+#     <nick> :p
+#     <nick> s/:/abc/s/p/defg/s/[ce]/^/s/d/o/s/a/\/s:g:/:s/b/(/s/f/)
+#     <bot> Nick meant: "\(^o^)/"
+#
 # v1.0 by Pixelz (rutgren@gmail.com), April 30, 2010
 
 package require Tcl 8.4
