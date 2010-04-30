@@ -1,7 +1,8 @@
 # substitute.tcl --
 #
 #     This script provides perl style text subsitution, with full regular
-#     expression support.
+#     expression support. Use ".chanset #chan +substitute" to enable the
+#     script in a channel.
 #
 # Copyright (c) 2010, Rickard Utgren <rutgren@gmail.com>
 #
@@ -19,13 +20,13 @@
 #
 # RCS: $Id$
 #
+# To enable: .chanset #chan +substitute
+#
 # Notes:
 #     Flags (i.e. global, case-insensitive) aren't supported directly in the
 #     syntax, however Tcl metasyntax can still be used. Expressions default to
 #     global/all, case-sensitive. Note that it's not possible to turn on or off
 #     global matching via metasyntax, this is because of a limitation in Tcl.
-#
-# To enable: .chanset #chan +substitute
 #
 # Usage examples:
 #     Basic usage
@@ -72,8 +73,8 @@
 #
 # v1.0 by Pixelz (rutgren@gmail.com), April 30, 2010
 
+package require Tcl 8.4
 package require eggdrop 1.6
-package require Tcl 8.5
 
 namespace eval ::substitute {
 	# minimum time in seconds before spoken lines are allowed to expire
