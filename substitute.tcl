@@ -20,7 +20,7 @@
 #
 # RCS: $Id$
 #
-# To enable: .chanset #chan +substitute
+# v1.0 by Pixelz (rutgren@gmail.com), May 2, 2010
 #
 # Notes:
 #     Flags (i.e. global, case-insensitive) aren't supported directly in the
@@ -75,8 +75,6 @@
 #     <nick> :p
 #     <nick> s/:/abc/s/p/defg/s/[ce]/^/s/d/o/s/a/\/s:g:/:s/b/(/s/f/)
 #     <bot> Nick meant: "\(^o^)/"
-#
-# v1.0 by Pixelz (rutgren@gmail.com), April 30, 2010
 
 package require Tcl 8.4
 package require eggdrop 1.6
