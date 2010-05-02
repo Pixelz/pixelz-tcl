@@ -1,6 +1,6 @@
 # substitute.tcl --
 #
-#     This script provides perl style text subsitution, with full regular
+#     This script provides sed style text subsitution, with full regular
 #     expression support. Use ".chanset #chan +substitute" to enable the
 #     script in a channel.
 #
