@@ -49,6 +49,7 @@
 # - test the idx lookup stuff more, I suspect there's a bug in it somewhere
 # - perhaps get rid of the daily unused-channels cleanup, and do it the same way as pixinfo.tcl.
 #		- Make sure this isn't hugely resource intensive first.
+# <kingkong> Pixelz: i have problem with pixseen.tcl , it says for example there is 8 results for the query but it shows only the oldest 5 results... and that means, i will never learn the fresh results? i want to know the user used which nickname for example, but it doesn't give this on result.. what should do?
 
 package require Tcl 8.5
 package require msgcat 1.4.2
