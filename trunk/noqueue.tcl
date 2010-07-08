@@ -22,7 +22,7 @@
 #
 # v1.0 by Pixelz (rutgren@gmail.com), July 8, 2010
 
-package require Tcl 8.5
+package require Tcl 8.4
 package require eggdrop 1.6.20
 
 namespace eval ::noqueue {}
