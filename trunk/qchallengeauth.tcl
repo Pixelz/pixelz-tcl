@@ -19,7 +19,7 @@
 #
 # RCS: $Id$
 #
-# v0.1 by Pixelz (rutgren@gmail.com), October 16, 2010
+# v0.1 by Pixelz (rutgren@gmail.com), October 17, 2010
 #
 # Features:
 #	- Supports authentication using HMAC-SHA-256, HMAC-SHA-1 and HMAC-MD5.
@@ -101,8 +101,18 @@ proc ::qchallengeauth::NOTC_CHALL {nick uhost hand text dest} {
 			putlog "Authed to $settings(nick) using HMAC-MD5"
 			return 1
 		} else {
-			# LEGACY-MD5 is not supported.
-			# FixMe: complain
+			if {$haveSha256} { lappend supportedAlgoritms {HMAC-SHA-256} } else { lappend unSupportedAlgoritms {HMAC-SHA-256} }
+			if {$haveSha1} { lappend supportedAlgoritms {HMAC-SHA-1} } else { lappend unSupportedAlgoritms {HMAC-SHA-1} }
+			if {$haveMd5} { lappend supportedAlgoritms {HMAC-MD5} } else { lappend unSupportedAlgoritms {HMAC-MD5} }
+			putlog "qchallengeauth.tcl: No usable hash algoritm recieved from $settings(qnick). It sent me: $algoritms."
+			if {[info exists supportedAlgoritms]} { putlog "qchallengeauth.tcl: I currently have the nessesary packages loaded to support: [join $supportedAlgoritms {,}]" }
+			if {[info exists unSupportedAlgoritms]} {
+				putlog "qchallengeauth.tcl: I currently don't have the nessesary packages to support: [join $supportedAlgoritms {,}]"
+				if {!$haveSha256 && [lsearch -exact [split $algoritms] {HMAC-SHA-256}]} { putlog "qchallengeauth.tcl: If you installed version 1.0.2 or above of the sha256 package from tcllib I could support HMAC-SHA-256." }
+				if {!$haveSha1 && [lsearch -exact [split $algoritms] {HMAC-SHA-1}]} { putlog "qchallengeauth.tcl: If you installed version 2.0.3 or above of the sha1 package from tcllib I could support HMAC-SHA-1." }
+				if {!$haveMd5 && [lsearch -exact [split $algoritms] {HMAC-MD5}]} { putlog "qchallengeauth.tcl: If you installed version 2.0.7 or above of the md5 package from tcllib I could support HMAC-MD5." }
+				if {[lsearch -exact [split $algoritms] {LEGACY-MD5}]} { putlog "qchallengeauth.tcl: There is no support for LEGACY-MD5, because of its outdated nature." }
+			}
 			return
 		}
 	}
@@ -174,13 +184,13 @@ proc ::qchallengeauth::EVNT {type} {
 
 proc ::qchallengeauth::nickInUse {from keyword text} {
 	variable authed
-	# FixMe: checking $authed here won't work because it'll always be set before this is sent, figure out another way to make this not trigger for _all_ 433 replies
-	if {!$authed || $keyword ne {433}} {
+	if {$keyword ne {433}} {
 		return
-	} elseif {[rfcequal [lindex [split $text] 1] $::nick]} {
+	} elseif {[rfcequal [set currNick [lindex [split $text] 1]] $::nick]} {
+		return
+	} elseif {[rfcequal $currNick [regsub -all -- {[0-9]} $::altnick {?}]]} {
 		return
 	} else {
-		# FixMe: check that altnick isn't already used before doing this
 		set alt $::altnick
 		while {[string first ? $alt] != -1} {
 			regsub -- {\?} $alt [expr {int(rand() * 10)}] alt
@@ -192,7 +202,7 @@ proc ::qchallengeauth::nickInUse {from keyword text} {
 proc ::qchallengeauth::INIT {} {
 	variable haveSha256; variable haveSha1; variable haveMd5; variable authed
 	
-	# FixMe: add putlogs, don't load all of them? load them later if needed?
+	# I thought about not loading all of these but I decided that memory is cheap so to hell with it.
 	if {![catch {package require sha256 1.0.2}]} { set haveSha256 1 } else { set haveSha256 0 }
 	if {![catch {package require sha1 2.0.3}]} { set haveSha1 1 } else { set haveSha1 0 }
 	if {![catch {package require md5 2.0.7}]} { set haveMd5 1 } else { set haveMd5 0 }
@@ -211,6 +221,7 @@ proc ::qchallengeauth::INIT {} {
 		bind evnt - {connect-server} ::qchallengeauth::EVNT
 		bind evnt - {disconnect-server} ::qchallengeauth::EVNT
 		bind raw - 433 ::qchallengeauth::nickInUse
+		
 		putlog {Loaded qchallengeauth.tcl v0.1 by Pixelz}
 	}
 }
