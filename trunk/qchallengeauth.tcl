@@ -28,14 +28,13 @@
 #	- Hides annoying Q replies from the the partyline and logs.
 #	- Overrides the internal connect logic to some degree to speed it up.
 #
-# ToDo:
-#	- Keep trying to auth to Q if we don't succeed
 # Maybe add:
 #	- Join channels after a set time if we can't auth
 #		- track Q joining a channel and auth if we're not authed
 #	- Don't load all encryption packages at init, instead load others later if needed
 #		- Rewrite self with a working hash package priority
 #	- Rewrite self with hashed password/auth
+#	- Better retry-auth logic, perhaps using ISON?
 
 package require eggdrop 1.6.20
 package require Tcl 8.5
@@ -176,6 +175,7 @@ proc ::qchallengeauth::EVNT {type} {
 				putquick "MODE $::botnick $settings(umodes)"
 			}
 			putquick "PRIVMSG $settings(msghost) :CHALLENGE"
+			timer 1 [list ::qchallengeauth::retryAuth]
 			return
 		}
 		default { return }
@@ -196,6 +196,14 @@ proc ::qchallengeauth::nickInUse {from keyword text} {
 			regsub -- {\?} $alt [expr {int(rand() * 10)}] alt
 		}
 		putquick "NICK $alt"
+	}
+}
+
+proc ::qchallengeauth::retryAuth {} {
+	variable authed; variable settings
+	if {!$authed} {
+		putquick "PRIVMSG $settings(msghost) :CHALLENGE"
+		timer 1 [list ::qchallengeauth::retryAuth]
 	}
 }
 
