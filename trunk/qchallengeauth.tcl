@@ -76,7 +76,7 @@ proc ::qchallengeauth::rfcequal {string1 string2} {
 }
 
 proc ::qchallengeauth::NOTC_CHALL {nick uhost hand text dest} {
-	variable settings; variable haveSha256; variable haveSha1; variable haveMd5
+	variable settings; variable haveSha256; variable haveSha1; variable haveMd5; variable timer
 	if {![rfcequal $dest $::botnick]} {
 		return
 	} elseif {![rfcequal $nick $settings(nick)] || ![string equal -nocase $uhost $settings(uhost)]} {
@@ -100,6 +100,7 @@ proc ::qchallengeauth::NOTC_CHALL {nick uhost hand text dest} {
 			putlog "Authed to $settings(nick) using HMAC-MD5"
 			return 1
 		} else {
+			if {[info exists timer] && [lsearch -index 2 [timers] $timer]} { killtimer $timer }
 			if {$haveSha256} { lappend supportedAlgoritms {HMAC-SHA-256} } else { lappend unSupportedAlgoritms {HMAC-SHA-256} }
 			if {$haveSha1} { lappend supportedAlgoritms {HMAC-SHA-1} } else { lappend unSupportedAlgoritms {HMAC-SHA-1} }
 			if {$haveMd5} { lappend supportedAlgoritms {HMAC-MD5} } else { lappend unSupportedAlgoritms {HMAC-MD5} }
@@ -124,7 +125,6 @@ proc ::qchallengeauth::NOTC_TRACK {nick uhost hand text dest} {
 	} elseif {![rfcequal $nick $settings(nick)] || ![string equal -nocase $uhost $settings(uhost)]} {
 		return
 	} else {
-		# FixMe: add possible failed auth responses to this list, and set authed 0 in those cases
 		switch -glob -nocase -- $text {
 			{You are now logged in as *.} -
 			{CHALLENGE is not available once you have authed.} {
@@ -164,7 +164,7 @@ proc ::qchallengeauth::OUT {queue message status} {
 }
 
 proc ::qchallengeauth::EVNT {type} {
-	variable authed; variable settings
+	variable authed; variable settings; variable timer
 	switch -exact -- $type {
 		connect-server - disconnect-server {
 			set authed 0
@@ -175,7 +175,7 @@ proc ::qchallengeauth::EVNT {type} {
 				putquick "MODE $::botnick $settings(umodes)"
 			}
 			putquick "PRIVMSG $settings(msghost) :CHALLENGE"
-			timer 1 [list ::qchallengeauth::retryAuth]
+			set timer [timer 1 [list ::qchallengeauth::retryAuth]]
 			return
 		}
 		default { return }
@@ -200,15 +200,15 @@ proc ::qchallengeauth::nickInUse {from keyword text} {
 }
 
 proc ::qchallengeauth::retryAuth {} {
-	variable authed; variable settings
+	variable authed; variable settings; variable timer
 	if {!$authed} {
 		putquick "PRIVMSG $settings(msghost) :CHALLENGE"
-		timer 1 [list ::qchallengeauth::retryAuth]
+		set timer [timer 1 [list ::qchallengeauth::retryAuth]]
 	}
 }
 
 proc ::qchallengeauth::INIT {} {
-	variable haveSha256; variable haveSha1; variable haveMd5; variable authed
+	variable settings; variable haveSha256; variable haveSha1; variable haveMd5; variable authed
 	
 	# I thought about not loading all of these but I decided that memory is cheap so to hell with it.
 	if {![catch {package require sha256 1.0.2}]} { set haveSha256 1 } else { set haveSha256 0 }
@@ -220,7 +220,12 @@ proc ::qchallengeauth::INIT {} {
 		namespace forget ::qchallengeauth
 		return
 	} else {
-		if {![info exists authed]} { set authed 0 }
+		if {![info exists authed]} {
+			set authed 0
+			if {${::server-online} > 0} {
+				putquick "PRIVMSG $settings(msghost) :CHALLENGE"
+			}
+		}
 	
 		bind notc - {CHALLENGE *} ::qchallengeauth::NOTC_CHALL
 		bind notc - {*} ::qchallengeauth::NOTC_TRACK
