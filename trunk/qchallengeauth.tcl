@@ -19,7 +19,7 @@
 #
 # RCS: $Id$
 #
-# v0.1 by Pixelz (rutgren@gmail.com), October 17, 2010
+# v0.1 by Pixelz (rutgren@gmail.com), October 19, 2010
 #
 # Features:
 #	- Supports authentication using HMAC-SHA-256, HMAC-SHA-1 and HMAC-MD5.
@@ -108,10 +108,10 @@ proc ::qchallengeauth::NOTC_CHALL {nick uhost hand text dest} {
 			if {[info exists supportedAlgoritms]} { putlog "qchallengeauth.tcl: I currently have the nessesary packages loaded to support: [join $supportedAlgoritms {,}]" }
 			if {[info exists unSupportedAlgoritms]} {
 				putlog "qchallengeauth.tcl: I currently don't have the nessesary packages to support: [join $supportedAlgoritms {,}]"
-				if {!$haveSha256 && [lsearch -exact [split $algoritms] {HMAC-SHA-256}]} { putlog "qchallengeauth.tcl: If you installed version 1.0.2 or above of the sha256 package from tcllib I could support HMAC-SHA-256." }
-				if {!$haveSha1 && [lsearch -exact [split $algoritms] {HMAC-SHA-1}]} { putlog "qchallengeauth.tcl: If you installed version 2.0.3 or above of the sha1 package from tcllib I could support HMAC-SHA-1." }
-				if {!$haveMd5 && [lsearch -exact [split $algoritms] {HMAC-MD5}]} { putlog "qchallengeauth.tcl: If you installed version 2.0.7 or above of the md5 package from tcllib I could support HMAC-MD5." }
-				if {[lsearch -exact [split $algoritms] {LEGACY-MD5}]} { putlog "qchallengeauth.tcl: There is no support for LEGACY-MD5, because of its outdated nature." }
+				if {!$haveSha256 && [lsearch -exact [split $algoritms] {HMAC-SHA-256}] != -1} { putlog "qchallengeauth.tcl: If you installed version 1.0.2 or above of the sha256 package from tcllib I could support HMAC-SHA-256." }
+				if {!$haveSha1 && [lsearch -exact [split $algoritms] {HMAC-SHA-1}] != -1} { putlog "qchallengeauth.tcl: If you installed version 2.0.3 or above of the sha1 package from tcllib I could support HMAC-SHA-1." }
+				if {!$haveMd5 && [lsearch -exact [split $algoritms] {HMAC-MD5}] != -1} { putlog "qchallengeauth.tcl: If you installed version 2.0.7 or above of the md5 package from tcllib I could support HMAC-MD5." }
+				if {[lsearch -exact [split $algoritms] {LEGACY-MD5}] != -1} { putlog "qchallengeauth.tcl: There is no support for LEGACY-MD5, because of its outdated nature." }
 			}
 			return
 		}
