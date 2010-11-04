@@ -884,7 +884,7 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 		} else {
 			putseen $nick $chan [mc {Displaying %1$s of %2$s results:} $numMatches $numMatches]
 		}
-		foreach match [lrange $result 0 2] {
+		foreach match [lrange $result 0 [expr {$pubResults - 1}]] {
 			if {$match ne {}} {
 				putseen $nick $chan [formatevent {*}[dbGetNick $match]]
 			}
@@ -957,7 +957,7 @@ proc ::pixseen::msgm_seen {nick uhost hand text} {
 		} else {
 			puthelp "NOTICE $nick :[mc {Displaying %1$s of %2$s results:} $numMatches $numMatches]"
 		}
-		foreach match [lrange $result 0 4] {
+		foreach match [lrange $result 0 [expr {$msgResults - 1}]] {
 			if {$match ne {}} {
 				puthelp "NOTICE $nick :[formatevent {*}[dbGetNick $match]]"
 			}
@@ -1023,7 +1023,7 @@ proc ::pixseen::dcc_seen {hand idx text} {
 		} else {
 			putdcc $idx [mc {Displaying %1$s of %2$s results:} $numMatches $numMatches]
 		}
-		foreach match [lrange $result 0 9] {
+		foreach match [lrange $result 0 [expr {$dccResults - 1}]] {
 			if {$match ne {}} {
 				putdcc $idx [formatevent {*}[dbGetNick $match]]
 			}
