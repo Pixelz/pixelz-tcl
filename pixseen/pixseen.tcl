@@ -22,6 +22,7 @@
 #	- Fixed a problem with ValidTable always failing on some older SQLite versions
 #	- Fixed a problem with the public trigger never showing the syntax help
 #	- Minor fixes
+#	- Fixed a problem with glob & regex matching where only the oldest matches would ever be returned
 #
 # v1.0 by Pixelz - April 5, 2010
 #	- Initial release
@@ -49,7 +50,8 @@
 # - test the idx lookup stuff more, I suspect there's a bug in it somewhere
 # - perhaps get rid of the daily unused-channels cleanup, and do it the same way as pixinfo.tcl.
 #		- Make sure this isn't hugely resource intensive first.
-# <kingkong> Pixelz: i have problem with pixseen.tcl , it says for example there is 8 results for the query but it shows only the oldest 5 results... and that means, i will never learn the fresh results? i want to know the user used which nickname for example, but it doesn't give this on result.. what should do?
+# - Add a setting to set the default matching type? OR Apply better logic to it? perhaps assume glob if it contains asterisk, Most Users fail at regex anyway...
+
 
 package require Tcl 8.5
 package require msgcat 1.4.2
@@ -663,7 +665,7 @@ proc ::pixseen::dbSearchGlob {nick uhost chan} {
 	set chan [string map [list "\\" "\\\\" "%" "\%" "_" "\_" "*" "%" "?" "_"] $chan]
 	if {$nick eq {}} { set nick "*"	}
 	if {$uhost eq {}} { set uhost "*" }	                                       
-	if {[catch { set result [seendb eval { SELECT nick FROM seenTb, chanTb ON seenTb.chanid = chanTb.chanid WHERE nick LIKE $nick ESCAPE '\' AND uhost LIKE $uhost ESCAPE '\' AND chanTb.chan LIKE $chan ESCAPE '\' }] } error]} {
+	if {[catch { set result [seendb eval { SELECT nick FROM seenTb, chanTb ON seenTb.chanid = chanTb.chanid WHERE nick LIKE $nick ESCAPE '\' AND uhost LIKE $uhost ESCAPE '\' AND chanTb.chan LIKE $chan ESCAPE '\' ORDER BY DESC seenTb.time }] } error]} {
 		putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 		return
 	} else {
@@ -673,7 +675,7 @@ proc ::pixseen::dbSearchGlob {nick uhost chan} {
 
 # returns: a list of nicks matching the pattern
 proc ::pixseen::dbSearchRegex {nick uhost chan} {
-if {[catch { set result [seendb eval { SELECT nick FROM seenTb, chanTb ON seenTb.chanid = chanTb.chanid WHERE nick REGEXP $nick AND uhost REGEXP $uhost AND chanTb.chan REGEXP $chan }] } error]} {
+if {[catch { set result [seendb eval { SELECT nick FROM seenTb, chanTb ON seenTb.chanid = chanTb.chanid WHERE nick REGEXP $nick AND uhost REGEXP $uhost AND chanTb.chan REGEXP $chan ORDER BY DESC seenTb.time }] } error]} {
 		putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 		return
 	} else {
