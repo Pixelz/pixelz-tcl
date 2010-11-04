@@ -23,6 +23,7 @@
 #	- Fixed a problem with the public trigger never showing the syntax help
 #	- Minor fixes
 #	- Fixed a problem with glob & regex matching where only the oldest matches would ever be returned
+#	- Added a setting to change the maximum number of results returned from a query
 #
 # v1.0 by Pixelz - April 5, 2010
 #	- Initial release
@@ -67,6 +68,15 @@ namespace eval ::pixseen {
 	
 	# Language
 	variable defaultLang "en"
+	
+	# Maximum number of results to display in public
+	variable pubResults 3
+	
+	# Maximum number of results to display in private message
+	variable msgResults 5
+	
+	# Maximum number of results to display in the partyline
+	variable dccResults 10
 	
 	## end of settings ##
 	
@@ -791,7 +801,8 @@ proc ::pixseen::putseen {nick chan notcText {msgText {}}} {
 # Handle public !seen
 # !seen [-exact/-glob/-regex] [--] <nick> [user@host] [channel]}
 proc ::pixseen::pubm_seen {nick uhost hand chan text} {
-	variable defaultLang
+	variable defaultLang; variable pubResults
+	if {![info exists pubResults] || ![string is integer $pubResults]} { set pubResults {3} }
 	if {![channel get $chan {seen}]} {
 		return
 	} elseif {![matchattr $hand f|f $chan]} {
@@ -868,8 +879,8 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 			return
 		}
 	} else {
-		if {[set numMatches [llength $result]] > 3} {
-			putseen $nick $chan [mc {Displaying %1$s of %2$s results:} {3} $numMatches]
+		if {[set numMatches [llength $result]] > $pubResults} {
+			putseen $nick $chan [mc {Displaying %1$s of %2$s results:} $pubResults $numMatches]
 		} else {
 			putseen $nick $chan [mc {Displaying %1$s of %2$s results:} $numMatches $numMatches]
 		}
@@ -887,6 +898,8 @@ proc ::pixseen::pubm_seen {nick uhost hand chan text} {
 
 # Handle /msg botnick seen 
 proc ::pixseen::msgm_seen {nick uhost hand text} {
+	variable msgResults
+	if {![info exists msgResults] || ![string is integer $msgResults]} { set msgResults {5} }
 	if {![matchattr $hand f]} {
 		if {[checkflood $uhost] != 0} {
 			return
@@ -939,8 +952,8 @@ proc ::pixseen::msgm_seen {nick uhost hand text} {
 			return
 		}
 	} else {
-		if {[set numMatches [llength $result]] > 5} {
-			puthelp "NOTICE $nick :[mc {Displaying %1$s of %2$s results:} {5} $numMatches]"
+		if {[set numMatches [llength $result]] > $msgResults} {
+			puthelp "NOTICE $nick :[mc {Displaying %1$s of %2$s results:} $msgResults $numMatches]"
 		} else {
 			puthelp "NOTICE $nick :[mc {Displaying %1$s of %2$s results:} $numMatches $numMatches]"
 		}
@@ -956,6 +969,8 @@ proc ::pixseen::msgm_seen {nick uhost hand text} {
 
 # Handle partyline .seen
 proc ::pixseen::dcc_seen {hand idx text} {
+	variable dccResults
+	if {![info exists dccResults] || ![string is integer $dccResults]} { set dccResults {10} }
 	if {[set arg [ParseArgs $text]] eq {}} {
 		putdcc $idx [mc {Usage: %s} {.seen [-exact/-glob/-regex] [--] <nick> [user@host] [channel]}]
 		return
@@ -1003,8 +1018,8 @@ proc ::pixseen::dcc_seen {hand idx text} {
 			return
 		}
 	} else {
-		if {[set numMatches [llength $result]] > 10} {
-			putdcc $idx [mc {Displaying %1$s of %2$s results:} {10} $numMatches]
+		if {[set numMatches [llength $result]] > $dccResults} {
+			putdcc $idx [mc {Displaying %1$s of %2$s results:} $dccResults $numMatches]
 		} else {
 			putdcc $idx [mc {Displaying %1$s of %2$s results:} $numMatches $numMatches]
 		}
