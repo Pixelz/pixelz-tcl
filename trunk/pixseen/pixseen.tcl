@@ -56,7 +56,7 @@
 package require Tcl 8.5
 package require msgcat 1.4.2
 package require eggdrop 1.6
-package require sqlite3
+package require sqlite3 3.3.0;# order by desc was added in this version
 
 namespace eval ::pixseen {
 	# path to the database file
@@ -665,7 +665,7 @@ proc ::pixseen::dbSearchGlob {nick uhost chan} {
 	set chan [string map [list "\\" "\\\\" "%" "\%" "_" "\_" "*" "%" "?" "_"] $chan]
 	if {$nick eq {}} { set nick "*"	}
 	if {$uhost eq {}} { set uhost "*" }	                                       
-	if {[catch { set result [seendb eval { SELECT nick FROM seenTb, chanTb ON seenTb.chanid = chanTb.chanid WHERE nick LIKE $nick ESCAPE '\' AND uhost LIKE $uhost ESCAPE '\' AND chanTb.chan LIKE $chan ESCAPE '\' ORDER BY DESC seenTb.time }] } error]} {
+	if {[catch { set result [seendb eval { SELECT nick FROM seenTb, chanTb ON seenTb.chanid = chanTb.chanid WHERE nick LIKE $nick ESCAPE '\' AND uhost LIKE $uhost ESCAPE '\' AND chanTb.chan LIKE $chan ESCAPE '\' ORDER BY seenTb.time DESC }] } error]} {
 		putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 		return
 	} else {
@@ -675,7 +675,7 @@ proc ::pixseen::dbSearchGlob {nick uhost chan} {
 
 # returns: a list of nicks matching the pattern
 proc ::pixseen::dbSearchRegex {nick uhost chan} {
-if {[catch { set result [seendb eval { SELECT nick FROM seenTb, chanTb ON seenTb.chanid = chanTb.chanid WHERE nick REGEXP $nick AND uhost REGEXP $uhost AND chanTb.chan REGEXP $chan ORDER BY DESC seenTb.time }] } error]} {
+if {[catch { set result [seendb eval { SELECT nick FROM seenTb, chanTb ON seenTb.chanid = chanTb.chanid WHERE nick REGEXP $nick AND uhost REGEXP $uhost AND chanTb.chan REGEXP $chan ORDER BY seenTb.time DESC }] } error]} {
 		putlog [mc {%1$s SQL error %2$s; %3$s} {pixseen.tcl} [seendb errorcode] $error]
 		return
 	} else {
