@@ -44,7 +44,8 @@
 #			* Considerations:
 #				* For both of these methods, the clock probably has to fairly synched up, particularly for the "synch everything" route
 #					- A simple solution: check TS delta on link, and complain loudly if it's too high, or compensate for it somehow
-# - Add IRCU support ("hidden" users in +D channels) -> names -d #chan
+# - Add IRCU support ("hidden" users in +D channels) -> names -d #chan (who #chan cd)
+#	- OR just tell quakenet users to use thommey's +D patch
 # - add option to track every channel separately
 # - track channel idle time, this would probably synergize well with the "track each channel separetly" option
 # - find out if it's a good idea to [catch] each sql query (catch is slow, is there a better alternative?)

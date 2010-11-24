@@ -39,18 +39,16 @@
 # ToDo:
 # - support gzip (it's not enough to just load the package, duh)
 # - cleanup cleanup cleanup
-# - depend on eggdrop1.6.20 once it's released
 # - fix FixMe's
-# - Check the size in the HEAD request, and bail out if it's something insane
-# - Ideally, I'd want to only get the first few KBs of the data, and stop once </title> is found, or bail out if it's fetching too much data.
-#
-# Either:
-# - Rewrite to use "::http::geturl -command" once 1.6.20 is out or the fileevent quickfix is commited to CVS
-# Or:
-# - Use coroutines, and depend on Tcl 8.6, probably wait until the current discussion regarding this has died down on tclcore though.
+# - Rewrite to use "::http::geturl -command"
+# - Hold release until eggdrop properly supports UTF-8
+
+# - Add a manual charset override that's exposed to users (separate from the .tld defaults we set)
+# - Add support for reading meta description, perhaps with a list where you can set which sites to do that for
+# - Add url-shortening (is.gd?, u.nu?)
 
 package require Tcl 8.5
-package require eggdrop 1.6.19
+package require eggdrop 1.6.20
 package require http 2.5
 package require htmlparse 1.1.3
 
@@ -304,6 +302,7 @@ proc ::http-title::pubm {nick uhost hand chan text {url {}} {referer {}} {cookie
 			}
 			# No charset detected, or it defaulted to iso8859-1. Set some defaults based on TLD
 			# FixMe: set ::http::defaultCharset to this instead, before ::http::geturl
+			# FixMe: doesn't work if a site is redirecting to a tld we're overriding here, ie tinyurl redirecting to a broken .ru site
 			if {($headerEnc eq {iso8859-1}) && ![info exists metaEnc] && [regexp -nocase -- {^https?://[^/?]+\.([^/?]+)(?:$|[/?]).*$} $url - tld]} {
 				switch -exact -nocase -- $tld {
 					{ru} { set data [encoding convertfrom {koi8-r} $data] }
