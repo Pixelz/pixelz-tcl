@@ -234,7 +234,7 @@ proc ::http-title::fixCharset {charset} {
 }
 
 proc ::http-title::pubm {nick uhost hand chan text {url {}} {referer {}} {cookies {}} {redirects {}}} {
-	if {[channel get $chan {http-title}] && ([string match -nocase "*http://*" [set stext [stripcodes bcruag $text]]] || [string match -nocase "*www.*" $stext]) && [regexp -nocase -- {(?:^|\s)(http://[^\s\\$]+|www.[^\s\\$]+)} $stext - url]} {
+	if {[channel get $chan {http-title}] && ([string match -nocase "*http://*" [set stext [stripcodes bcruag $text]]] || [string match -nocase "*https://*" $stext] || [string match -nocase "*www.*" $stext]) && [regexp -nocase -- {(?:^|\s)(https?://[^\s\\$]+|www.[^\s\\$]+)} $stext - url]} {
 		# set nick suffix
 		if {[string equal -nocase [string index $nick end] s]} { set suffix {'} } else { set suffix {'s} }
 		if {![string match -nocase "http://*" $url]} { set url "http://${url}" }
