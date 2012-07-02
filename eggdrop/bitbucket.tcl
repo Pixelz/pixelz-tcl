@@ -22,6 +22,7 @@
 #
 # v1.0 by Pixelz (rutgren@gmail.com), July 3, 2012
 
+package require eggdrop 1.6
 package require Tcl 8.5
 package require http 2.7
 package require tls 1.6
@@ -130,7 +131,7 @@ proc ::bitbucket::shortenUrlCallback {token} {
 		putloglev d * "bitbucket.tcl $state(http): $state(error)"
 	} else {
 		if {![string match "http://is.gd/*" [set shortUrl [string trim $state(body)]]]} {
-			putloglev d "bitbucket.tcl url shortening failed, body is not an url"
+			putloglev d * "bitbucket.tcl url shortening failed, body is not a url"
 		} else {
 			# announce new commits
 			foreach chan [channels] {
