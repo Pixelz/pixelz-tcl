@@ -80,13 +80,6 @@ namespace eval ::weechat::script::tclsh {
 		::weechat::buffer_set $bufferHand "title" "tclsh"
 		::weechat::buffer_set $bufferHand "localvar_set_no_log" "1"
 		::weechat::hook_command tclsh {evaluate Tcl code} {<code>} {} {} ::weechat::script::tclsh::tclsh_cb {}
-		# close channels that's not needed in weechat
-		close stdin
-		close stdout
-		close stderr
-		open /dev/null r;# stdin
-		open /dev/null w;# stdout
-		open /dev/null w;# stderr
 		set initDone 1
 	}
 }
