@@ -70,7 +70,9 @@ proc ::bitbucket::rssCallback {token} {
 	variable lastCommit
 	upvar #0 $token state
 	if {$state(status) ne {ok}} {
-		putloglev d * "bitbucket.tcl $state(http): $state(error)"
+		putloglev d * "bitbucket.tcl http error: $state(status)"
+	} elseif {[::http::ncode $token] != 200} {
+		putloglev d * "bitbucket.tcl http error: [::http::ncode $token]"
 	} else {
 		# parse the xml
 		set doc [dom parse $state(body)]
@@ -115,8 +117,11 @@ proc ::bitbucket::getRss {args} {
 	if {[info exists rssChecking]} {
 		return
 	} else {
-		set rssChecking 1
-		::http::geturl $feedUrl -timeout 10000 -command ::bitbucket::rssCallback
+		if {[catch {::http::geturl $feedUrl -timeout 10000 -command ::bitbucket::rssCallback} result]} {
+			putloglev d * "bitbucket.tcl error while connecting to rss feed: $result"
+		} else {
+			set rssChecking 1
+		}
 	}
 	return
 }
@@ -128,7 +133,9 @@ proc ::bitbucket::shortenUrlCallback {token} {
 	lassign $shortenState($token) title author fileCountOutput filesOutput
 	upvar #0 $token state
 	if {$state(status) ne {ok}} {
-		putloglev d * "bitbucket.tcl $state(http): $state(error)"
+		putloglev d * "bitbucket.tcl http error: $state(status)"
+	} elseif {[::http::ncode $token] != 200} {
+		putloglev d * "bitbucket.tcl http error: [::http::ncode $token]"
 	} else {
 		if {![string match "http://is.gd/*" [set shortUrl [string trim $state(body)]]]} {
 			putloglev d * "bitbucket.tcl url shortening failed, body is not a url"
@@ -153,8 +160,11 @@ proc ::bitbucket::shortenUrlCallback {token} {
 # shorten urls using is.gd
 proc ::bitbucket::shortenUrl {url data} {
 	variable shortenState
-	set tok [::http::geturl "http://is.gd/create.php?format=simple&url=$url" -timeout 10000 -command ::bitbucket::shortenUrlCallback]
-	set shortenState($tok) $data
+	if {[catch {::http::geturl "http://is.gd/create.php?format=simple&url=$url" -timeout 10000 -command ::bitbucket::shortenUrlCallback} result]} {
+		putloglev d * "bitbucket.tcl error while connecting to is.gd: $message"
+	} else {
+		set shortenState($result) $data
+	}
 	return
 }
 
