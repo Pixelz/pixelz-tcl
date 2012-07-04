@@ -47,6 +47,7 @@ namespace eval ::bitbucket {
 
 # spaghetti proc by thommey
 proc ::bitbucket::getfilestr {filesdict {brace 0}} {
+	putloglev d * [info level 0]
 	# combine files in a dict
 	set files [list]
 	foreach k [dict keys $filesdict] {
@@ -68,6 +69,7 @@ proc ::bitbucket::getfilestr {filesdict {brace 0}} {
 proc ::bitbucket::rssCallback {token} {
 	variable rssChecking
 	variable lastCommit
+	putloglev d * [info level 0]
 	upvar #0 $token state
 	if {$state(status) ne {ok}} {
 		putloglev d * "bitbucket.tcl http error: $state(status)"
@@ -82,12 +84,23 @@ proc ::bitbucket::rssCallback {token} {
 			set link [string trim [[$item selectNodes link/text()] data]]
 			set description [::htmlparse::mapEscapes [[$item selectNodes description/text()] data]]
 			set author [string trim [[$item selectNodes author/text()] data]]
-			set unixtime [clock scan  [set pubDate [string trim [[$item selectNodes pubDate/text()] data]]] -format "%a, %d %b %Y %T %z"]
+			set unixtime [clock scan [set pubDate [string trim [[$item selectNodes pubDate/text()] data]]] -format "%a, %d %b %Y %T %z"]
 			foreach {- file info} [regexp -all -inline -- {<li><a[^>]+>\s+([^<]+?)\s+</a>\(([^)]+)\)</li>} $description] {
 				dict set files $file $info
 			}
+			putloglev d * "$title $unixtime $pubDate"
 			if {![info exists lastCommit] || ([info exists lastCommit] && $unixtime > $lastCommit)} {
+				if {![info exists lastCommit]} {
+					putloglev d * "lastCommit doesn't exist"
+				} else {
+					putloglev d * "unixtime $unixtime > lastCommit $lastCommit"
+				}
 				if {![info exists currentHighestUnixtime] || ([info exists currentHighestUnixtime] && $unixtime > $currentHighestUnixtime)} {
+					if {![info exists currentHighestUnixtime]} {
+						putloglev d * "currentHighestUnixtime doesn't exist, setting to $unixtime"
+					} else {
+						putloglev d * "unixtime $unixtime > currentHighestUnixtime $currentHighestUnixtime"
+					}
 					set currentHighestUnixtime $unixtime
 				}
 				# format output					
@@ -100,6 +113,7 @@ proc ::bitbucket::rssCallback {token} {
 			}
 		}
 		if {[info exists currentHighestUnixtime]} {
+			putloglev d * "setting lastCommit to $currentHighestUnixtime"
 			set lastCommit $currentHighestUnixtime
 			saveState
 		}
@@ -114,6 +128,7 @@ proc ::bitbucket::rssCallback {token} {
 proc ::bitbucket::getRss {args} {
 	variable feedUrl
 	variable rssChecking
+	putloglev d * [info level 0]
 	if {[info exists rssChecking]} {
 		return
 	} else {
@@ -130,6 +145,7 @@ proc ::bitbucket::getRss {args} {
 proc ::bitbucket::shortenUrlCallback {token} {
 	variable repoName
 	variable shortenState
+	putloglev d * [info level 0]
 	lassign $shortenState($token) title author fileCountOutput filesOutput
 	upvar #0 $token state
 	if {$state(status) ne {ok}} {
@@ -160,8 +176,9 @@ proc ::bitbucket::shortenUrlCallback {token} {
 # shorten urls using is.gd
 proc ::bitbucket::shortenUrl {url data} {
 	variable shortenState
-	if {[catch {::http::geturl "http://is.gd/create.php?format=simple&url=$url" -timeout 10000 -command ::bitbucket::shortenUrlCallback} result]} {
-		putloglev d * "bitbucket.tcl error while connecting to is.gd: $message"
+	putloglev d * [info level 0]
+	if {[catch {::http::geturl "http://is.gd/create.php?[::http::formatQuery format simple url $url]" -timeout 10000 -command ::bitbucket::shortenUrlCallback} result]} {
+		putloglev d * "bitbucket.tcl error while connecting to is.gd: $result"
 	} else {
 		set shortenState($result) $data
 	}
@@ -171,7 +188,9 @@ proc ::bitbucket::shortenUrl {url data} {
 proc ::bitbucket::saveState {} {
 	variable lastCommit
 	variable stateFile
+	putloglev d * [info level 0]
 	if {[info exists lastCommit]} {
+		putloglev d * "saving lastCommit $lastCommit on file"
 		set fd [open $stateFile w]
 		puts $fd $lastCommit
 		close $fd
@@ -182,12 +201,15 @@ proc ::bitbucket::saveState {} {
 proc ::bitbucket::loadState {} {
 	variable lastCommit
 	variable stateFile
+	putloglev d * [info level 0]
 	if {[file exists $stateFile]} {
 		set fd [open $stateFile r]
 		set unixtime [string trim [read $fd]]
 		close $fd
 		if {[info exists lastCommit]} {
+			putloglev d * "loadState: lastCommit: $lastCommit"
 			if {$unixtime > $lastCommit} {
+				putloglev d * "loadState: unixtime $unixtime > lastCommit $lastCommit"
 				set lastCommit $unixtime
 			}
 		}
