@@ -119,8 +119,8 @@ proc ::bitbucket::rssCallback {token} {
 		}
 	}
 	# clean up
-	unset rssChecking
-	::http::cleanup $token
+	unset -nocomplain rssChecking
+	catch { ::http::cleanup $token }
 	return
 }
 
@@ -168,8 +168,8 @@ proc ::bitbucket::shortenUrlCallback {token} {
 		}
 	}
 	# clean up
-	unset shortenState($token)
-	::http::cleanup $token
+	unset -nocomplain shortenState($token)
+	catch { ::http::cleanup $token }
 	return
 }
 
@@ -212,6 +212,8 @@ proc ::bitbucket::loadState {} {
 				putloglev d * "loadState: unixtime $unixtime > lastCommit $lastCommit"
 				set lastCommit $unixtime
 			}
+		} else {
+			set lastCommit $unixtime
 		}
 	}
 	return
