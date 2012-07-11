@@ -22,7 +22,7 @@
 #
 # v1.0 by Pixelz (rutgren@gmail.com), July 3, 2012
 
-package require eggdrop 1.6
+package require eggdrop 1.6.21
 package require Tcl 8.5
 package require http 2.7
 package require tls 1.6
@@ -222,7 +222,6 @@ proc ::bitbucket::loadState {} {
 namespace eval ::bitbucket {
 	loadState
 	# check for new commits every 5 minutes
-	bind time - "?0" ::bitbucket::getRss
-	bind time - "?5" ::bitbucket::getRss
+	bind cron - "*/5" ::bitbucket::getRss
 	putlog "Loaded bitbucket.tcl v1.0 by Pixelz"
 }
