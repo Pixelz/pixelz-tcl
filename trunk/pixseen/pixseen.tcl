@@ -24,6 +24,7 @@
 #	- Minor fixes
 #	- Fixed a problem with glob & regex matching where only the oldest matches would ever be returned
 #	- Added a setting to change the maximum number of results returned from a query
+#   - Fixed a problem with Hand2Uhost never returning anything useful
 #
 # v1.0 by Pixelz - April 5, 2010
 #	- Initial release
@@ -154,8 +155,8 @@ proc ::pixseen::Idx2Uhost {idx} {
 # ONLY to be called from finduhost. DON'T CALL THIS DIRECTLY!
 proc ::pixseen::Hand2Uhost {botname hand {chan {*}}} {
 	foreach item [whom $chan] {
-		lassign $item Hand Botname Uhost Flags Idle Away Chan
-		if {[string equal -nocase $botname $Botname] && [string equal -nocase $hand $Hand] && ($chan ne {*} && [string equal -nocase $chan $Chan])} {
+		lassign $item Hand Botname Uhost Flags Idle Away
+		if {[string equal -nocase $botname $Botname] && [string equal -nocase $hand $Hand]} {
 			return $Uhost
 		}
 	}
