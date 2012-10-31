@@ -24,7 +24,7 @@
 #	- Minor fixes
 #	- Fixed a problem with glob & regex matching where only the oldest matches would ever be returned
 #	- Added a setting to change the maximum number of results returned from a query
-#   - Fixed a problem with Hand2Uhost never returning anything useful
+#	- Fixed a problem with Hand2Uhost never returning anything useful
 #
 # v1.0 by Pixelz - April 5, 2010
 #	- Initial release
