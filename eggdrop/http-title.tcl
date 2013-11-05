@@ -74,14 +74,14 @@ namespace eval ::http-title {
 	if {([lsearch -exact [info commands] zlib] != -1) || (![catch {package require zlib}])} {
 		# we have zlib
 		set haveGzip 1
-		putlog {http-title: zlib found, gzip compression availible.}
+		#putlog {http-title: zlib found, gzip compression availible.}
 	} elseif {([lsearch -exact [info commands] zip] != -1) || (![catch {package require Trf}])} {
 		# we have Trf
 		set haveGzip 2
-		putlog {http-title: Trf found, gzip compression availible.}
+		#putlog {http-title: Trf found, gzip compression availible.}
 	} else {
 		set haveGzip 0
-		putlog {http-title: zlib or Trf not found, gzip compression unavailable.}
+		#putlog {http-title: zlib or Trf not found, gzip compression unavailable.}
 	}
 }
 
@@ -203,6 +203,18 @@ proc ::http-title::punycode_encode_digit {d} {
 
 ## end of IDNA procs
 
+
+# by BEO http://wiki.tcl.tk/10874
+proc ::http-title::format_1024_units {value} {
+	set len [string length $value]
+	if {$value < 1024} {
+		format "%s B" $value
+	} else {
+		set unit [expr {($len - 1) / 3}]
+		format "%.1f %s" [expr {$value / pow(1024,$unit)}] [lindex [list B KiB MiB GiB TiB PiB EiB ZiB YiB] $unit]
+	}
+}
+
 proc ::http-title::fixCharset {charset} {
 	set lcharset [string tolower $charset]
 	switch -glob -nocase -- $charset {
@@ -259,14 +271,14 @@ proc ::http-title::pubm {nick uhost hand chan text {url {}} {referer {}} {cookie
 			}
 		}
 		# bail out if we couldn't get the content-type
-		if {![info exists content-type]} {
+		if {![info exists {content-type}]} {
 			return
 		}
 		# if content-type isn't html, we stop here
 		if {${content-type} ne {text/html}} {
 			array set meta $state(meta)
 			if {[info exists meta(Content-Length)]} {
-				putserv "PRIVMSG $chan :${nick}${suffix} URL title: N/A ( ${content-type}\; $meta(Content-Length) bytes )"
+				putserv "PRIVMSG $chan :${nick}${suffix} URL title: N/A ( ${content-type}\; [format_1024_units ${meta(Content-Length)}] )"
 				return
 			} else {
 				putserv "PRIVMSG $chan :${nick}${suffix} URL title: N/A ( ${content-type}\; unknown size )"
@@ -321,9 +333,9 @@ proc ::http-title::pubm {nick uhost hand chan text {url {}} {referer {}} {cookie
 				if {[string length $title] > 350} {
 					set title "[string range $title 0 350]..."
 				}
-				putserv "PRIVMSG $chan :${nick}${suffix} URL title: $title ( ${content-type}\; [string bytelength $data] bytes )"
+				putserv "PRIVMSG $chan :${nick}${suffix} URL title: $title ( ${content-type}\; [format_1024_units [string bytelength $data]] )"
 			} else {
-				putserv "PRIVMSG $chan :${nick}${suffix} URL title: N/A ( ${content-type}\; [string bytelength $data] bytes )"
+				putserv "PRIVMSG $chan :${nick}${suffix} URL title: N/A ( ${content-type}\; [format_1024_units [string bytelength $data]] )"
 			}
 		}
 	}
