@@ -120,6 +120,7 @@ proc ::bitbucket::rssCallback {token} {
 	}
 	# clean up
 	unset -nocomplain rssChecking
+	catch { $doc delete }
 	catch { ::http::cleanup $token }
 	return
 }
