@@ -53,6 +53,34 @@ package require http 2.5
 package require htmlparse 1.1.3
 
 namespace eval ::http-title {
+	
+	## BEGINNING OF SETTINGS ##
+	
+	# Display information for files without a title? This will potentially show
+	# content type and file size.
+	variable outputContentType 0
+	
+	# Apply logic to which URLs we display titles for? This will stop the
+	# script from displaying titles that are too similar to the URL,
+	# such as http://www.example.com/ -> Example
+	variable outputAntiSpamLogic 1
+	
+	# Prepend the output with the nick of the person who sent the URL?
+	# I.e. "Nick's URL title: example"
+	variable prependNick 0
+	
+	# Always display the title for these domains
+	variable alwaysShow [list "youtube.com" "imdb.com"]
+	
+	# Never display the title for these domains
+	variable neverShow [list "wikipedia.org" "github.com"]
+	
+	# Attempt to change the URL to point to a displayable title for these
+	# image hosts. This simply removes the file extension at the end of the URL.
+	variable fixImageHosts [list "i.imgur.com"]
+	
+	## END OF SETTINGS ##
+	
 	setudef flag {http-title}
 	encoding system {utf-8}
 	variable ::http::defaultCharset
@@ -215,6 +243,72 @@ proc ::http-title::format_1024_units {value} {
 	}
 }
 
+## thommeycode by thommey
+# implementation of Levenshtein distance
+proc ::http-title::dec {x {i 1}} { incr x -$i }
+
+proc ::http-title::inc {x {i 1}} { incr x +$i }
+
+proc ::http-title::equal {a b} {
+	if {[string equal -nocase $a $b] || ![string is alnum $a] && ![string is alnum $b]} {
+		return 1
+	}
+	return 0
+}
+
+proc ::http-title::dump {} {
+	uplevel {
+		for {set u 0} {$u <= $umax} {incr u} {
+			for {set t 0} {$t <= $tmax} {incr t} {
+				puts -nonewline "$d($u,$t) "
+			}
+			puts ""
+		}
+	}
+}
+
+proc ::http-title::distance {url title} {
+	set umax [string length $url]
+	set tmax [string length $title]
+	# initialize array
+	for {set u 0} {$u <= $umax} {incr u} {
+		for {set t 0} {$t <= $tmax} {incr t} {
+			set d($u,$t) 0
+		}
+	}
+	for {set u 1} {$u <= $umax} {incr u} {
+		# free deletion at the start (so it ignores "http://blog.bla.com/" from "http://blog.bla.com/here-is-the-title"
+		# set d($u,0) $u
+	}
+	for {set t 1} {$t <= $tmax} {incr t} {
+		set d(0,$t) $t
+	}
+	for {set t 1} {$t <= $tmax} {incr t} {
+		for {set u 1} {$u <= $umax} {incr u} {
+			if {[equal [string index $url [expr {$u-1}]] [string index $title [expr {$t-1}]]]} {
+				set d($u,$t) $d([dec $u],[dec $t])
+			} else {
+				# inserts are free, deletion and substitution cost 1
+				set ins $d([dec $u],$t)
+				set del $d($u,[dec $t])
+				set sub $d([dec $u],[dec $t])
+				incr del
+				incr sub
+				set d($u,$t) [::tcl::mathfunc::min $ins $del $sub]
+			}
+		}
+	}
+	expr {100.0-100.0*$d($umax,$tmax)/$tmax}
+}
+
+# compares the url with the title
+# returns a percentage
+proc ::http-title::compareUrlTitle {url title} {
+	return [format "%.2f" [distance $url $title]]
+}
+
+## end of thommeycode
+
 proc ::http-title::fixCharset {charset} {
 	set lcharset [string tolower $charset]
 	switch -glob -nocase -- $charset {
@@ -245,19 +339,64 @@ proc ::http-title::fixCharset {charset} {
 	}
 }
 
-proc ::http-title::pubm {nick uhost hand chan text {url {}} {referer {}} {cookies {}} {redirects {}}} {
-	if {[channel get $chan {http-title}] && ([string match -nocase "*http://*" [set stext [stripcodes bcruag $text]]] || [string match -nocase "*https://*" $stext] || [string match -nocase "*www.*" $stext]) && [regexp -nocase -- {(?:^|\s)(https?://[^\s\\$]+|www.[^\s\\$]+)} $stext - url]} {
+# generate output prefix based on settings
+proc ::http-title::outputPrefix {nick} {
+	variable prependNick
+	if {[info exists prependNick] && $prependNick == 1} {
 		# set nick suffix
 		if {[string equal -nocase [string index $nick end] s]} { set suffix {'} } else { set suffix {'s} }
+		return "${nick}${suffix} URL title:"
+	} else {
+		return "URL title:"
+	}
+}
+
+# attempt to "fix" image hosts such as imgur by removing the fileext at the end
+# of the URL to get a displayable title
+proc ::http-title::fixImageHosts {domain url} {
+	variable fixImageHosts
+	set cont 0
+	foreach d $fixImageHosts {
+		if {[string match -nocase *$d $domain]} {
+			return [regsub -- {\.[a-zA-Z0-9]{3,4}$} $url ""]
+		}
+	}
+	# this is not an URL that needs fixing
+	return $url
+}
+
+# checks if a title is useful enough to warrant outputting
+proc ::http-title::titleIsUseful {domain url title} {
+	variable alwaysShow
+	variable neverShow
+	# manual override domains
+	foreach d $alwaysShow {
+		if {[string match -nocase *$d $domain]} { return 1 }
+	}
+	foreach d $neverShow {
+		if {[string match -nocase *$d $domain]} { return 0 }
+	}	
+	if {[compareUrlTitle $url $title] < 80} {
+		return 1
+	} else {
+		return 0
+	}
+}
+
+proc ::http-title::pubm {nick uhost hand chan text {url {}} {referer {}} {cookies {}} {redirects {}}} {
+	variable outputContentType
+	if {[channel get $chan {http-title}] && ([string match -nocase "*http://*" [set stext [stripcodes bcruag $text]]] || [string match -nocase "*https://*" $stext] || [string match -nocase "*www.*" $stext]) && [regexp -nocase -- {(?:^|\s)(https?://[^\s\\$]+|www.[^\s\\$]+)} $stext - url]} {
 		if {![string match -nocase "http://*" $url] && ![string match -nocase "https://*" $url]} { set url "http://${url}" }
 		# fix urls like http://domain.tld?foo
 		regsub -nocase -- {(^https?://[^/?]+)(\?)} $url {\1/?} url
 		# split the domain from the url
 		regexp -nocase -- {(https?://)([^/]+)(.*)} $url - pre domain post
-		# detect urls like http://-www.google.com, which will be seen as a flag by [socket]
-		if {[string index $domain 0] eq {-}} { return }
 		# handle internationalized domain names
 		set url ${pre}[domain_toascii $domain]${post}
+		# detect urls like http://-www.google.com, which will be seen as a flag by [socket]
+		if {[string index $domain 0] eq {-}} { return }
+		# check if the url needs fixing
+		set url [fixImageHosts $domain $url]
 		# first, do a HTTP HEAD request, to get an idea of what we're dealing with
 		if {[set wget [wget $url 1]] eq {}} {
 			return
@@ -277,11 +416,13 @@ proc ::http-title::pubm {nick uhost hand chan text {url {}} {referer {}} {cookie
 		# if content-type isn't html, we stop here
 		if {${content-type} ne {text/html}} {
 			array set meta $state(meta)
-			if {[info exists meta(Content-Length)]} {
-				putserv "PRIVMSG $chan :${nick}${suffix} URL title: N/A ( ${content-type}\; [format_1024_units ${meta(Content-Length)}] )"
-				return
-			} else {
-				putserv "PRIVMSG $chan :${nick}${suffix} URL title: N/A ( ${content-type}\; unknown size )"
+			if {[info exists outputContentType] && $outputContentType == 1} {
+				if {[info exists meta(Content-Length)]} {
+					putserv "PRIVMSG $chan :[outputPrefix $nick] N/A ( ${content-type}\; [format_1024_units ${meta(Content-Length)}] )"
+					return
+				} else {
+					putserv "PRIVMSG $chan :[outputPrefix $nick] N/A ( ${content-type}\; unknown size )"
+				}
 			}
 			return
 		}
@@ -315,6 +456,7 @@ proc ::http-title::pubm {nick uhost hand chan text {url {}} {referer {}} {cookie
 			# No charset detected, or it defaulted to iso8859-1. Set some defaults based on TLD
 			# FixMe: set ::http::defaultCharset to this instead, before ::http::geturl
 			# FixMe: doesn't work if a site is redirecting to a tld we're overriding here, ie tinyurl redirecting to a broken .ru site
+			# FixMe: make this configurable?
 			if {($headerEnc eq {iso8859-1}) && ![info exists metaEnc] && [regexp -nocase -- {^https?://[^/?]+\.([^/?]+)(?:$|[/?]).*$} $url - tld]} {
 				switch -exact -nocase -- $tld {
 					{ru} { set data [encoding convertfrom {koi8-r} $data] }
@@ -333,9 +475,18 @@ proc ::http-title::pubm {nick uhost hand chan text {url {}} {referer {}} {cookie
 				if {[string length $title] > 350} {
 					set title "[string range $title 0 350]..."
 				}
-				putserv "PRIVMSG $chan :${nick}${suffix} URL title: $title ( ${content-type}\; [format_1024_units [string bytelength $data]] )"
+				# check if the title is useful enough to output
+				if {[titleIsUseful $domain $url $title]} {
+					if {[info exists outputContentType] && $outputContentType == 1} {
+						putserv "PRIVMSG $chan :[outputPrefix $nick] $title ( ${content-type}\; [format_1024_units [string bytelength $data]] )"
+					} else {
+						putserv "PRIVMSG $chan :[outputPrefix $nick] $title"
+					}
+				}
 			} else {
-				putserv "PRIVMSG $chan :${nick}${suffix} URL title: N/A ( ${content-type}\; [format_1024_units [string bytelength $data]] )"
+				if {[info exists outputContentType] && $outputContentType == 1} {
+					putserv "PRIVMSG $chan :[outputPrefix $nick] N/A ( ${content-type}\; [format_1024_units [string bytelength $data]] )"
+				}
 			}
 		}
 	}
