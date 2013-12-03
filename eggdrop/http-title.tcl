@@ -73,7 +73,7 @@ namespace eval ::http-title {
 	variable alwaysShow [list "youtube.com" "imdb.com"]
 	
 	# Never display the title for these domains
-	variable neverShow [list "code.google.com" "github.com"]
+	variable neverShow [list "code.google.com" "github.com" "fukung.net"]
 	
 	# Attempt to change the URL to point to a displayable title for these
 	# image hosts. This simply removes the file extension at the end of the URL.
@@ -423,7 +423,8 @@ proc ::http-title::titleIsUseful {domain url title} {
 	}
 	foreach d $neverShow {
 		if {[string match -nocase *$d $domain]} { return 0 }
-	}	
+	}
+	if {[string equal -nocase "imgur: the simple image sharer" $title]} { return 0 }
 	if {[compareUrlTitle $url $title] < $stringDistance} {
 		return 1
 	} else {
@@ -495,7 +496,7 @@ proc ::http-title::pubm {nick uhost hand chan text {url {}} {referer {}} {cookie
 			#	set headerEnc {iso8859-1}
 			}
 			# grab the charset from the HTML <meta> tags
-			if {[regexp -nocase -- {<meta [^>]*?charset="?([a-zA-Z0-9\-_]+)[^>]*>} $data - metaEnc]} {
+			if {[regexp -nocase -- {<meta [^>]*?charset="?([a-zA-Z0-9\-_]+)[^>]*>} $data - metaEnc]} {;#"
 				if {[set metaEnc [fixCharset $metaEnc]] eq {1}} { return }
 				if {![string equal -nocase $headerEnc $metaEnc]} {
 					# HTTP header charset & meta charset doesn't match, assume that meta is correct
