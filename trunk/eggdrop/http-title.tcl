@@ -73,13 +73,15 @@ namespace eval ::http-title {
 	variable alwaysShow [list "youtube.com" "imdb.com"]
 	
 	# Never display the title for these domains
-	variable neverShow [list "wikipedia.org" "github.com"]
+	variable neverShow [list "code.google.com" "github.com"]
 	
 	# Attempt to change the URL to point to a displayable title for these
 	# image hosts. This simply removes the file extension at the end of the URL.
 	variable fixImageHosts [list "i.imgur.com"]
 	
 	## END OF SETTINGS ##
+	
+	variable stringDistance 80
 	
 	setudef flag {http-title}
 	encoding system {utf-8}
@@ -298,16 +300,61 @@ proc ::http-title::distance {url title} {
 			}
 		}
 	}
-	expr {100.0-100.0*$d($umax,$tmax)/$tmax}
-}
-
-# compares the url with the title
-# returns a percentage
-proc ::http-title::compareUrlTitle {url title} {
-	return [format "%.2f" [distance $url $title]]
+	return [format "%.0f" [expr {100.0-100.0*$d($umax,$tmax)/$tmax}]]
 }
 
 ## end of thommeycode
+
+# compares the URL with the title
+# returns a percentage
+proc ::http-title::compareUrlTitle {url title} {
+	# sanitize both strings
+	foreach char [split [regsub -- {^https?://} [string tolower $url] ""] {}] {
+		if {[string is alnum $char]} {
+			append stripUrl $char
+		} else {
+			append stripUrl " "
+		}
+	}
+	# get rid of duplicate whitespace
+	set stripUrl [join [regexp -inline -all -- {\S+} $stripUrl]]
+	
+	foreach char [split [string tolower $title] {}] {
+		if {[string is alnum $char]} {
+			append stripTitle $char
+		} else {
+			append stripTitle " "
+		}
+	}
+	set stripTitle [join [regexp -inline -all -- {\S+} $stripTitle]]
+	
+	# match everything to everything and build an array of match scores
+	set titlePos 0
+	foreach titlePart [split $stripTitle] {
+		set urlPos 0
+		foreach urlPart [split $stripUrl] {
+			lappend matchScores [list $titlePos $urlPos [distance $urlPart $titlePart]]
+			incr urlPos
+		}
+		incr titlePos
+	}
+	if {![info exists matchScores]} { return 0 }
+	
+	# find the best matches
+	set matchScores [lsort -integer -decreasing -index 2 $matchScores]
+	set matchedUrlParts [list]
+	set matchedTitleParts [list]
+	foreach match $matchScores {
+		lassign $match titlePos urlPos matchScore
+		if {[lsearch -exact $matchedTitleParts $titlePos] == -1 && [lsearch -exact $matchedUrlParts $urlPos] == -1} {
+			lappend matchedTitleParts $titlePos
+			lappend matchedUrlParts $urlPos
+			lappend matchResults $matchScore
+		}
+	}
+	
+	return [format "%.2f" [expr {double([::tcl::mathop::+ {*}$matchResults])/[llength $matchResults]}]]
+}
 
 proc ::http-title::fixCharset {charset} {
 	set lcharset [string tolower $charset]
@@ -369,6 +416,7 @@ proc ::http-title::fixImageHosts {domain url} {
 proc ::http-title::titleIsUseful {domain url title} {
 	variable alwaysShow
 	variable neverShow
+	variable stringDistance
 	# manual override domains
 	foreach d $alwaysShow {
 		if {[string match -nocase *$d $domain]} { return 1 }
@@ -376,7 +424,7 @@ proc ::http-title::titleIsUseful {domain url title} {
 	foreach d $neverShow {
 		if {[string match -nocase *$d $domain]} { return 0 }
 	}	
-	if {[compareUrlTitle $url $title] < 80} {
+	if {[compareUrlTitle $url $title] < $stringDistance} {
 		return 1
 	} else {
 		return 0
@@ -385,6 +433,7 @@ proc ::http-title::titleIsUseful {domain url title} {
 
 proc ::http-title::pubm {nick uhost hand chan text {url {}} {referer {}} {cookies {}} {redirects {}}} {
 	variable outputContentType
+	if {[string match "!titlescore *" $text]} { set showScore 1 } else { set showScore 0 }
 	if {[channel get $chan {http-title}] && ([string match -nocase "*http://*" [set stext [stripcodes bcruag $text]]] || [string match -nocase "*https://*" $stext] || [string match -nocase "*www.*" $stext]) && [regexp -nocase -- {(?:^|\s)(https?://[^\s\\$]+|www.[^\s\\$]+)} $stext - url]} {
 		if {![string match -nocase "http://*" $url] && ![string match -nocase "https://*" $url]} { set url "http://${url}" }
 		# fix urls like http://domain.tld?foo
@@ -476,11 +525,15 @@ proc ::http-title::pubm {nick uhost hand chan text {url {}} {referer {}} {cookie
 					set title "[string range $title 0 350]..."
 				}
 				# check if the title is useful enough to output
-				if {[titleIsUseful $domain $url $title]} {
-					if {[info exists outputContentType] && $outputContentType == 1} {
+				if {[titleIsUseful $domain $url $title] || $showScore} {
+					if {[info exists outputContentType] && $outputContentType == 1 && !$showScore} {
 						putserv "PRIVMSG $chan :[outputPrefix $nick] $title ( ${content-type}\; [format_1024_units [string bytelength $data]] )"
 					} else {
-						putserv "PRIVMSG $chan :[outputPrefix $nick] $title"
+						if {$showScore} {
+							putserv "PRIVMSG $chan :Title score: [compareUrlTitle $url $title]% Title: $title"
+						} else {
+							putserv "PRIVMSG $chan :[outputPrefix $nick] $title"
+						}
 					}
 				}
 			} else {
