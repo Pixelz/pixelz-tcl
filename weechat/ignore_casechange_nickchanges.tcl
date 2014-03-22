@@ -51,7 +51,6 @@ proc ::weechat::script::casenick::UNLOAD {args} {
 # initialization
 namespace eval ::weechat::script::casenick {
         variable initDone
-        variable bufferHand
 
         #name: string, internal name of script
         #author: string, author name
