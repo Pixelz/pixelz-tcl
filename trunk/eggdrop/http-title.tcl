@@ -56,6 +56,9 @@ namespace eval ::http-title {
 	
 	## BEGINNING OF SETTINGS ##
 	
+	# Display title for links sent in ACTIONs to the channel?
+	variable catchAction 1
+	
 	# Display information for files without a title? This will potentially show
 	# content type and file size.
 	variable outputContentType 0
@@ -432,6 +435,18 @@ proc ::http-title::titleIsUseful {domain url title} {
 	}
 }
 
+proc ::http-title::ctcp {nick uhost hand dest keyword text} {
+	# dest == channel
+	# keyword == ACTION
+	variable catchAction
+	if {![channel get $dest {http-title}] || ![info exists catchAction] || $catchAction != 1} {
+		return
+	} else {
+		::http-title::pubm $nick $uhost$hand $dest $text
+		return
+	}
+}
+
 proc ::http-title::pubm {nick uhost hand chan text {url {}} {referer {}} {cookies {}} {redirects {}}} {
 	variable outputContentType
 	if {[string match "!titlescore *" $text]} { set showScore 1 } else { set showScore 0 }
@@ -641,5 +656,6 @@ proc ::http-title::wget {url validate {refer ""} {cookies ""} {re 0}} {
 
 namespace eval ::http-title {
 	bind pubm - "*" ::http-title::pubm
+	bind ctcp - "*" ::http-title::ctcp
 	putlog "Loaded http-title.tcl v0.1 by Pixelz"
 }
