@@ -439,10 +439,10 @@ proc ::http-title::ctcp {nick uhost hand dest keyword text} {
 	# dest == channel
 	# keyword == ACTION
 	variable catchAction
-	if {![channel get $dest {http-title}] || ![info exists catchAction] || $catchAction != 1} {
+	if {![channel get $dest {http-title}] || ![string equal -nocase $keyword {ACTION}] || ![info exists catchAction] || $catchAction != 1} {
 		return
 	} else {
-		::http-title::pubm $nick $uhost$hand $dest $text
+		::http-title::pubm $nick $uhost $hand $dest $text
 		return
 	}
 }
