@@ -428,8 +428,10 @@ proc ::http-title::titleIsUseful {domain url title} {
 	foreach d $neverShow {
 		if {[string match -nocase *$d $domain]} { return 0 }
 	}
+	# if spam logic is turned off, the title is always useful
+	if {$outputAntiSpamLogic == 0} { return 1 }
 	if {[string equal -nocase "imgur: the simple image sharer" $title]} { return 0 }
-	if {$outputAntiSpamLogic == 1 || [compareUrlTitle $url $title] < $stringDistance} {
+	if {[compareUrlTitle $url $title] < $stringDistance} {
 		return 1
 	} else {
 		return 0
