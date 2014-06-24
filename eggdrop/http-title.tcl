@@ -417,6 +417,7 @@ proc ::http-title::fixImageHosts {domain url} {
 
 # checks if a title is useful enough to warrant outputting
 proc ::http-title::titleIsUseful {domain url title} {
+	variable outputAntiSpamLogic
 	variable alwaysShow
 	variable neverShow
 	variable stringDistance
@@ -428,7 +429,7 @@ proc ::http-title::titleIsUseful {domain url title} {
 		if {[string match -nocase *$d $domain]} { return 0 }
 	}
 	if {[string equal -nocase "imgur: the simple image sharer" $title]} { return 0 }
-	if {[compareUrlTitle $url $title] < $stringDistance} {
+	if {$outputAntiSpamLogic == 1 || [compareUrlTitle $url $title] < $stringDistance} {
 		return 1
 	} else {
 		return 0
@@ -565,7 +566,7 @@ proc ::http-title::pubm {nick uhost hand chan text {url {}} {referer {}} {cookie
 # mostly written by speechles
 # made to actually work by me
 proc ::http-title::wget {url validate {refer ""} {cookies ""} {re 0}} {
-	http::config -urlencoding {utf-8}
+	http::config -useragent {Mozilla/5.0 (Windows NT 6.1; WOW64; rv:28.0) Gecko/20100101 Firefox/29.0} -urlencoding {utf-8}
 	# if we have cookies, let's use em ;)
 	if {![string length $cookies]} {
 		catch {set token [http::geturl $url -validate $validate -timeout 3000]} error
